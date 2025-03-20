@@ -1,0 +1,47 @@
+FROM node:18-slim
+
+# Install Chrome dependencies and FFmpeg
+RUN apt-get update && apt-get install -y \
+    chromium \
+    ffmpeg \
+    libx11-xcb1 \
+    libxcomposite1 \
+    libxcursor1 \
+    libxdamage1 \
+    libxi6 \
+    libxtst6 \
+    libnss3 \
+    libcups2 \
+    libxss1 \
+    libxrandr2 \
+    libasound2 \
+    libpangocairo-1.0-0 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libgtk-3-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set Chrome executable path
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm install
+
+# Copy source code
+COPY src/ ./src/
+
+# Set environment variables
+ENV NODE_ENV=production
+ENV SCRAPER_SERVICE=true
+
+# Expose port for health checks
+EXPOSE 3001
+
+# Start the scraper service
+CMD ["node", "src/services/scraper/index.js"] 

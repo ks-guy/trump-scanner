@@ -1,0 +1,85 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./src:/app/src
+      - ./logs:/app/logs
+    environment:
+      - NODE_ENV=development
+      - DB_HOST=db
+      - REDIS_HOST=redis
+    depends_on:
+      - db
+      - redis
+    networks:
+      - trump_scanner_network
+
+  scraper:
+    build:
+      context: .
+      dockerfile: Dockerfile.scraper
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./src:/app/src
+      - ./logs:/app/logs
+      - ./media:/app/media
+    environment:
+      - NODE_ENV=production
+      - REDIS_HOST=redis
+      - MAX_CONCURRENT_SCRAPES=50
+      - REQUEST_DELAY=2000
+    depends_on:
+      - redis
+    networks:
+      - trump_scanner_network
+
+  db:
+    image: mysql:8.0
+    container_name: trump_scanner_mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: trump_scanner
+      MYSQL_USER: scanner_user
+      MYSQL_PASSWORD: scanner_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./src/database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - trump_scanner_network
+
+  redis:
+    image: redis:6.2
+    container_name: trump_scanner_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - trump_scanner_network
+
+volumes:
+  mysql_data:
+  redis_data:
+
+networks:
+  trump_scanner_network:
+    driver: bridge 
