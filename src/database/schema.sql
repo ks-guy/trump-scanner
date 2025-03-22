@@ -257,4 +257,27 @@ INSERT IGNORE INTO source_categories (name, description) VALUES
 INSERT IGNORE INTO media_storage (storage_type, base_path, max_storage_size) VALUES
 ('local', './media_storage', 10737418240); -- 10GB default storage limit
 
+-- Archive tables
+CREATE TABLE IF NOT EXISTS archives (
+    id VARCHAR(36) PRIMARY KEY,
+    path TEXT NOT NULL,
+    start_date DATETIME NOT NULL,
+    end_date DATETIME NOT NULL,
+    platforms JSON NOT NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS platform_archives (
+    id VARCHAR(36) PRIMARY KEY,
+    archive_id VARCHAR(36) NOT NULL,
+    platform VARCHAR(50) NOT NULL,
+    path TEXT NOT NULL,
+    start_date DATETIME NOT NULL,
+    end_date DATETIME NOT NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (archive_id) REFERENCES archives(id) ON DELETE CASCADE
+);
+
 SET FOREIGN_KEY_CHECKS = 1; 
