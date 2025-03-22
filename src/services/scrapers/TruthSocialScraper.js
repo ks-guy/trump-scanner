@@ -2,6 +2,8 @@ import puppeteer from 'puppeteer';
 import logger from '../../utils/logger.js';
 import { sleep, randomDelay, retry } from '../../utils/helpers.js';
 import { Quote } from '../../models/Quote.js';
+import { ProxyManager } from '../../utils/proxyManager.js';
+import fs from 'fs/promises';
 
 class TruthSocialScraper {
     constructor(config = {}) {
@@ -13,10 +15,19 @@ class TruthSocialScraper {
             },
             maxRetries: 3,
             defaultUsername: 'realDonaldTrump', // Trump's official Truth Social handle
+            maxRequestsPerHour: 100, // Rate limiting
+            maxPostsPerRequest: 1000, // Limit posts per request
+            requestTimeout: 30000,
+            retryDelay: 5000,
+            screenshotDir: 'debug/screenshots/truth_social',
+            debugDir: 'debug/logs/truth_social',
             ...config
         };
         this.browser = null;
         this.page = null;
+        this.requestCount = 0;
+        this.lastRequestTime = Date.now();
+        this.proxyManager = new ProxyManager();
     }
 
     async initialize() {
@@ -124,154 +135,115 @@ class TruthSocialScraper {
         }
     }
 
+    // Add rate limiting check
+    async checkRateLimit() {
+        const now = Date.now();
+        const hourElapsed = now - this.lastRequestTime >= 3600000; // 1 hour in milliseconds
+
+        if (hourElapsed) {
+            this.requestCount = 0;
+            this.lastRequestTime = now;
+        }
+
+        if (this.requestCount >= this.config.maxRequestsPerHour) {
+            const waitTime = 3600000 - (now - this.lastRequestTime);
+            logger.warn(`Rate limit reached. Waiting ${Math.ceil(waitTime / 1000)} seconds...`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+            this.requestCount = 0;
+            this.lastRequestTime = Date.now();
+        }
+
+        this.requestCount++;
+    }
+
     async scrapeProfile(username = null, options = {}) {
         const targetUsername = username || this.config.defaultUsername;
-        try {
-            const url = `https://truthsocial.com/@${targetUsername}`;
-            logger.info(`Navigating to ${url}`);
-            
-            // Try to load the page with retries
-            await retry(async () => {
-                const response = await this.page.goto(url, { 
-                    waitUntil: ['networkidle0', 'domcontentloaded'],
-                    timeout: 60000 
+        const url = `https://truthsocial.com/@${targetUsername}`;
+        let browser = null;
+        let retries = 0;
+
+        while (retries < this.config.maxRetries) {
+            try {
+                await this.checkRateLimit();
+                browser = await puppeteer.launch({
+                    headless: 'new',
+                    args: ['--no-sandbox', '--disable-setuid-sandbox']
+                });
+
+                const page = await browser.newPage();
+                const proxy = await this.proxyManager.getProxy();
+                if (proxy) {
+                    await page.authenticate({
+                        username: proxy.username,
+                        password: proxy.password
+                    });
+                }
+
+                await page.setViewport({ width: 1920, height: 1080 });
+                await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
+
+                // Set timeout for navigation
+                await page.setDefaultNavigationTimeout(this.config.requestTimeout);
+
+                // Navigate to profile
+                const response = await page.goto(url, {
+                    waitUntil: 'networkidle0'
                 });
 
                 if (!response.ok()) {
-                    throw new Error(`Failed to load page: ${response.status()} ${response.statusText()}`);
+                    throw new Error(`HTTP error! status: ${response.status()}`);
                 }
 
-                // Wait for the page to load and stabilize
-                await sleep(10000); // Increased wait time
-
-                // Log the current page content for debugging
-                const content = await this.page.content();
-                logger.info('Page content preview:', content.substring(0, 500));
-
-                // Wait for any of these selectors to appear
-                const selectors = [
-                    'article[data-testid="post"]',
-                    'div[data-testid="post"]',
-                    'article[class*="post"]',
-                    'div[class*="post"]',
-                    'article[class*="truth"]',
-                    'div[class*="truth"]',
-                    'article[class*="tweet"]',
-                    'div[class*="tweet"]',
-                    'article[class*="status"]',
-                    'div[class*="status"]',
-                    '.timeline-posts',
-                    '.post',
-                    '[data-testid="post"]',
-                    '.status-card',
-                    '.post-card',
-                    '[data-testid="tweet"]',
-                    '.tweet'
-                ];
-
-                let foundSelector = false;
-                for (const selector of selectors) {
-                    try {
-                        await this.page.waitForSelector(selector, { 
-                            timeout: 10000,
-                            visible: true 
-                        });
-                        logger.info(`Found posts with selector: ${selector}`);
-                        foundSelector = true;
-                        break;
-                    } catch (e) {
-                        continue;
-                    }
+                // Check for rate limiting
+                const content = await page.content();
+                if (content.includes('rate limit') || content.includes('too many requests')) {
+                    throw new Error('Rate limit detected');
                 }
 
-                if (!foundSelector) {
-                    throw new Error('No post selectors found on page');
-                }
-
-                // Check if we're being blocked or redirected
-                const currentUrl = this.page.url();
-                if (currentUrl.includes('blocked') || currentUrl.includes('captcha') || currentUrl !== url) {
-                    throw new Error('Access blocked or redirected');
-                }
-
-                // Take a screenshot for debugging
-                await this.page.screenshot({ 
-                    path: 'page-loaded.png', 
-                    fullPage: true 
+                // Wait for profile data to load
+                await page.waitForSelector('div[data-testid="profile"]', {
+                    timeout: this.config.requestTimeout
                 });
 
-                // Get page content for debugging
-                if (content.includes('blocked') || content.includes('captcha')) {
-                    throw new Error('Access blocked or captcha detected');
-                }
-
-                // Wait for network idle
-                await this.page.waitForFunction(() => {
-                    return window.performance.getEntriesByType('resource')
-                        .filter(r => r.initiatorType === 'xmlhttprequest' || r.initiatorType === 'fetch')
-                        .every(r => r.responseEnd !== 0);
-                }, { timeout: 10000 });
-
-            }, {
-                maxRetries: 3,
-                initialDelay: 5000,
-                maxDelay: 15000
-            });
-
-            let posts = [];
-            let lastPostCount = 0;
-            let scrollAttempts = 0;
-            const maxScrollAttempts = options.maxScrollAttempts || 50;
-
-            while (scrollAttempts < maxScrollAttempts) {
-                // Extract posts
-                const newPosts = await this.extractPosts();
-                logger.info(`Extracted ${newPosts.length} new posts`);
-                
-                // Add new unique posts
-                for (const post of newPosts) {
-                    if (!posts.some(p => p.id === post.id)) {
-                        posts.push(post);
-                    }
-                }
-
-                // Check if we've found new posts
-                if (posts.length === lastPostCount) {
-                    scrollAttempts++;
-                    logger.info(`No new posts found. Attempt ${scrollAttempts}/${maxScrollAttempts}`);
-                } else {
-                    scrollAttempts = 0;
-                    lastPostCount = posts.length;
-                }
-
-                // Scroll and wait for new content
-                await this.page.evaluate(() => {
-                    window.scrollTo(0, document.body.scrollHeight);
+                // Extract profile data
+                const profile = await page.evaluate(() => {
+                    const profileEl = document.querySelector('div[data-testid="profile"]');
+                    return {
+                        username: profileEl.querySelector('h1')?.textContent?.trim(),
+                        displayName: profileEl.querySelector('h2')?.textContent?.trim(),
+                        bio: profileEl.querySelector('p[data-testid="bio"]')?.textContent?.trim(),
+                        followers: parseInt(profileEl.querySelector('span[data-testid="followers"]')?.textContent?.replace(/[^0-9]/g, '') || '0'),
+                        following: parseInt(profileEl.querySelector('span[data-testid="following"]')?.textContent?.replace(/[^0-9]/g, '') || '0'),
+                        verified: !!profileEl.querySelector('svg[data-testid="verified-badge"]'),
+                        joinedDate: profileEl.querySelector('span[data-testid="joined-date"]')?.textContent?.trim()
+                    };
                 });
-                
-                // Random delay between scrolls
-                await randomDelay(3000, 5000);
 
-                // Log progress
-                logger.info(`Found ${posts.length} posts so far...`);
-            }
+                // Save debug info
+                await this.saveDebugInfo('profile', profile);
 
-            // Save posts to database
-            if (posts.length > 0) {
-                await this.savePosts(posts);
-            } else {
-                logger.warn('No posts found to save');
+                return profile;
+            } catch (error) {
+                retries++;
+                logger.error(`Error scraping profile (attempt ${retries}/${this.config.maxRetries}):`, error);
+
+                if (browser) {
+                    await browser.close();
+                }
+
+                if (retries === this.config.maxRetries) {
+                    throw new Error(`Failed to scrape profile after ${this.config.maxRetries} attempts`);
+                }
+
+                // Take screenshot on error
+                if (browser) {
+                    const page = await browser.newPage();
+                    await this.takeScreenshot(page, 'profile_error');
+                }
+
+                // Wait before retrying
+                await new Promise(resolve => setTimeout(resolve, this.config.retryDelay * retries));
             }
-            
-            return posts;
-        } catch (error) {
-            logger.error('Error scraping Truth Social profile:', error);
-            // Take a screenshot for debugging
-            await this.page.screenshot({
-                path: 'debug/screenshots/error-screenshot.png',
-                fullPage: true
-            });
-            throw error;
         }
     }
 
@@ -495,6 +467,26 @@ class TruthSocialScraper {
             await this.browser.close();
             this.browser = null;
             this.page = null;
+        }
+    }
+
+    async takeScreenshot(page, name) {
+        try {
+            await page.screenshot({
+                path: `${this.config.screenshotDir}/${name}_${Date.now()}.png`,
+                fullPage: true
+            });
+        } catch (error) {
+            logger.error(`Error taking screenshot ${name}:`, error);
+        }
+    }
+
+    async saveDebugInfo(name, data) {
+        try {
+            const debugPath = `${this.config.debugDir}/${name}_${Date.now()}.json`;
+            await fs.writeFile(debugPath, JSON.stringify(data, null, 2));
+        } catch (error) {
+            logger.error(`Error saving debug info ${name}:`, error);
         }
     }
 }
