@@ -1,15 +1,11 @@
-const { ChartJSNodeCanvas } = require('chartjs-node-canvas');
+const Chart = require('chart.js');
+const { createCanvas } = require('canvas');
 const path = require('path');
 const fs = require('fs').promises;
 const { logger } = require('../../utils/logger');
 
 class VisualizationService {
     constructor() {
-        this.chartJSNodeCanvas = new ChartJSNodeCanvas({
-            width: 1200,
-            height: 800,
-            backgroundColour: 'white'
-        });
         this.chartsDir = path.join(process.cwd(), 'reports', 'charts');
     }
 
@@ -49,7 +45,10 @@ class VisualizationService {
         const reposts = engagementByDay.map(d => d.reposts);
         const replies = engagementByDay.map(d => d.replies);
 
-        const configuration = {
+        const canvas = createCanvas(1200, 800);
+        const ctx = canvas.getContext('2d');
+
+        const chart = new Chart(ctx, {
             type: 'line',
             data: {
                 labels: dates,
@@ -88,10 +87,10 @@ class VisualizationService {
                     }
                 }
             }
-        };
+        });
 
-        const image = await this.chartJSNodeCanvas.renderToBuffer(configuration);
-        await fs.writeFile(path.join(this.chartsDir, 'engagement-chart.png'), image);
+        const buffer = canvas.toBuffer('image/png');
+        await fs.writeFile(path.join(this.chartsDir, 'engagement-chart.png'), buffer);
     }
 
     /**
@@ -103,9 +102,11 @@ class VisualizationService {
     async generatePostingPatternsChart(report) {
         const { postingPatterns } = report.trends;
         const hours = Array.from({ length: 24 }, (_, i) => `${i}:00`);
-        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-        const configuration = {
+        const canvas = createCanvas(1200, 800);
+        const ctx = canvas.getContext('2d');
+
+        const chart = new Chart(ctx, {
             type: 'bar',
             data: {
                 labels: hours,
@@ -131,10 +132,10 @@ class VisualizationService {
                     }
                 }
             }
-        };
+        });
 
-        const image = await this.chartJSNodeCanvas.renderToBuffer(configuration);
-        await fs.writeFile(path.join(this.chartsDir, 'posting-patterns-chart.png'), image);
+        const buffer = canvas.toBuffer('image/png');
+        await fs.writeFile(path.join(this.chartsDir, 'posting-patterns-chart.png'), buffer);
     }
 
     /**
@@ -148,7 +149,10 @@ class VisualizationService {
         const words = topWords.map(w => w.word);
         const counts = topWords.map(w => w.count);
 
-        const configuration = {
+        const canvas = createCanvas(1200, 800);
+        const ctx = canvas.getContext('2d');
+
+        const chart = new Chart(ctx, {
             type: 'bar',
             data: {
                 labels: words,
@@ -175,10 +179,10 @@ class VisualizationService {
                     }
                 }
             }
-        };
+        });
 
-        const image = await this.chartJSNodeCanvas.renderToBuffer(configuration);
-        await fs.writeFile(path.join(this.chartsDir, 'word-cloud-chart.png'), image);
+        const buffer = canvas.toBuffer('image/png');
+        await fs.writeFile(path.join(this.chartsDir, 'word-cloud-chart.png'), buffer);
     }
 
     /**
@@ -192,7 +196,10 @@ class VisualizationService {
         const weeks = engagementTrend.map(t => t.week);
         const engagement = engagementTrend.map(t => t.averageEngagement);
 
-        const configuration = {
+        const canvas = createCanvas(1200, 800);
+        const ctx = canvas.getContext('2d');
+
+        const chart = new Chart(ctx, {
             type: 'line',
             data: {
                 labels: weeks,
@@ -219,10 +226,10 @@ class VisualizationService {
                     }
                 }
             }
-        };
+        });
 
-        const image = await this.chartJSNodeCanvas.renderToBuffer(configuration);
-        await fs.writeFile(path.join(this.chartsDir, 'trend-chart.png'), image);
+        const buffer = canvas.toBuffer('image/png');
+        await fs.writeFile(path.join(this.chartsDir, 'trend-chart.png'), buffer);
     }
 }
 

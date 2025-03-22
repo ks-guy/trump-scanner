@@ -10,11 +10,13 @@
     "verify": "node src/scripts/verify_documents.js",
     "scrape:all": "npm run scrape && npm run verify",
     "test": "jest",
-    "lint": "eslint src/"
+    "lint": "eslint src/",
+    "generate-analytics": "node src/scripts/generateAnalytics.js"
   },
   "dependencies": {
     "@prisma/client": "^6.5.0",
     "axios": "^1.6.7",
+    "chart.js": "^4.4.2",
     "cheerio": "^1.0.0-rc.12",
     "crypto": "^1.0.1",
     "dotenv": "^16.4.1",
@@ -31,8 +33,7 @@
     "puppeteer-extra-plugin-stealth": "^2.11.2",
     "sqlite3": "^5.1.7",
     "tesseract.js": "^6.0.0",
-    "winston": "^3.11.0",
-    "chartjs-node-canvas": "^4.1.6"
+    "winston": "^3.11.0"
   },
   "devDependencies": {
     "eslint": "^9.23.0",
