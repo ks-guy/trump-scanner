@@ -1,12 +1,46 @@
-const { PrismaClient } = require('@prisma/client');
-const { logger } = require('../../utils/logger');
-const path = require('path');
-const fs = require('fs').promises;
+import { PrismaClient } from '@prisma/client';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import fs from 'fs/promises';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 class TruthSocialAnalytics {
     constructor() {
         this.prisma = new PrismaClient();
         this.reportsDir = path.join(process.cwd(), 'reports');
+    }
+
+    /**
+     * Calculate average engagement for a time period
+     * @private
+     * @param {Date} startDate Start date
+     * @param {Date} endDate End date
+     * @returns {Promise<number>} Average engagement
+     */
+    async calculateAverageEngagement(startDate, endDate) {
+        try {
+            console.log('Calculating average engagement...');
+            const result = await this.prisma.post.aggregate({
+                where: {
+                    createdAt: {
+                        gte: startDate,
+                        lte: endDate
+                    }
+                },
+                _avg: {
+                    likes: true,
+                    reposts: true,
+                    replies: true
+                }
+            });
+            console.log('Average engagement result:', result);
+            return (result._avg.likes || 0) + (result._avg.reposts || 0) + (result._avg.replies || 0);
+        } catch (error) {
+            console.error('Error calculating average engagement:', error);
+            throw error;
+        }
     }
 
     /**
@@ -23,6 +57,21 @@ class TruthSocialAnalytics {
                 includeTrends = true
             } = options;
 
+            console.log('Generating report with options:', { startDate, endDate, includeEngagement, includeTrends });
+
+            // Test database connection
+            try {
+                await this.prisma.$connect();
+                console.log('Database connection successful');
+            } catch (error) {
+                console.error('Database connection failed:', error);
+                throw error;
+            }
+
+            // Count total posts to verify data access
+            const totalPosts = await this.prisma.post.count();
+            console.log('Total posts in database:', totalPosts);
+
             const report = {
                 timestamp: new Date().toISOString(),
                 period: {
@@ -38,8 +87,11 @@ class TruthSocialAnalytics {
             await this.saveReport(report);
             return report;
         } catch (error) {
-            logger.error('Error generating analytics report:', error);
+            console.error('Error generating analytics report:', error);
             throw error;
+        } finally {
+            await this.prisma.$disconnect();
+            console.log('Database connection closed');
         }
     }
 
@@ -51,6 +103,7 @@ class TruthSocialAnalytics {
      * @returns {Promise<Object>} Summary statistics
      */
     async generateSummary(startDate, endDate) {
+        console.log('Generating summary statistics...');
         const [
             totalPosts,
             totalReplies,
@@ -100,7 +153,7 @@ class TruthSocialAnalytics {
             this.calculateAverageEngagement(startDate, endDate)
         ]);
 
-        return {
+        const summary = {
             totalPosts,
             totalReplies,
             totalLikes: totalLikes._sum.likes || 0,
@@ -108,6 +161,9 @@ class TruthSocialAnalytics {
             averageEngagement,
             postsPerDay: Math.round(totalPosts / ((endDate - startDate) / (24 * 60 * 60 * 1000)))
         };
+
+        console.log('Summary statistics:', summary);
+        return summary;
     }
 
     /**
@@ -423,12 +479,12 @@ class TruthSocialAnalytics {
                 path.join(this.reportsDir, filename),
                 JSON.stringify(report, null, 2)
             );
-            logger.info(`Analytics report saved to ${filename}`);
+            console.log(`Analytics report saved to ${filename}`);
         } catch (error) {
-            logger.error('Error saving analytics report:', error);
+            console.error('Error saving analytics report:', error);
             throw error;
         }
     }
 }
 
-module.exports = TruthSocialAnalytics; 
+export default TruthSocialAnalytics; 

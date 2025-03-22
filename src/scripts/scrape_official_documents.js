@@ -1,11 +1,16 @@
-const { default: ora } = require('ora');
-const { sources, config } = require('../config/sources');
-const QuoteScraperService = require('../services/scraper/QuoteScraperService');
-const Quote = require('../models/Quote');
-const logger = require('../utils/logger');
-const fs = require('fs');
-const path = require('path');
-const https = require('https');
+import ora from 'ora';
+import { sources, config } from '../config/sources.js';
+import { QuoteScraperService } from '../services/scraper/QuoteScraperService.js';
+import { Quote } from '../models/Quote.js';
+import { logger } from '../utils/logger.js';
+import fs from 'fs';
+import path from 'path';
+import https from 'https';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 let spinner = null;
 let scraper = null;
@@ -88,113 +93,319 @@ async function isValidDocumentPage(url) {
 }
 
 async function extractDocumentContent(page) {
+    // Wait for content with improved timeout and retry logic
+    const waitForContent = async (page, maxRetries = 3) => {
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                await page.waitForSelector([
+                    '.fr-box-official',
+                    '.document-content',
+                    '.body-content',
+                    '#fulltext_content_area',
+                    'article',
+                    '.main-content'
+                ].join(','), {
+                    timeout: 30000,
+                    visible: true
+                });
+                return true;
+            } catch (error) {
+                if (attempt === maxRetries) {
+                    debug(`Content load failed after ${maxRetries} attempts`, error.message);
+                    return false;
+                }
+                debug(`Retry ${attempt}/${maxRetries} loading content`, null);
+                await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+            }
+        }
+        return false;
+    };
+
+    // Enhanced page navigation with retry logic
+    const loadPage = async (page, url, maxRetries = 3) => {
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                const response = await page.goto(url, {
+                    waitUntil: ['networkidle0', 'domcontentloaded'],
+                    timeout: 60000
+                });
+                
+                if (!response.ok()) {
+                    throw new Error(`HTTP ${response.status()}`);
+                }
+                
+                // Wait for any dynamic content
+                const contentLoaded = await waitForContent(page);
+                if (!contentLoaded && attempt === maxRetries) {
+                    debug('Failed to load content after retries', url);
+                    return false;
+                }
+                return true;
+            } catch (error) {
+                if (attempt === maxRetries) {
+                    debug(`Page load failed after ${maxRetries} attempts`, error.message);
+                    return false;
+                }
+                debug(`Retry ${attempt}/${maxRetries} loading page`, url);
+                await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+            }
+        }
+        return false;
+    };
+
     return await page.evaluate(() => {
-        // Helper function to safely get text content
-        const getText = (selector) => {
-            const el = document.querySelector(selector);
-            return el ? el.textContent.trim() : '';
+        // Debug logging function with timestamp
+        const debug = (msg, data) => {
+            const timestamp = new Date().toISOString();
+            console.log(`[${timestamp}] [Debug] ${msg}:`, data);
         };
 
-        // Helper function to get metadata from multiple possible selectors
-        const getMetadata = (selectors) => {
-            for (const selector of selectors) {
-                const text = getText(selector);
-                if (text) return text;
-            }
-            return '';
-        };
-
-        // Document format selectors by source
-        const formats = {
-            federalRegister: {
-                content: '.document-content, .body-content, .word-content',
-                signature: '.signature, .president-signature, .sig-block',
-                number: '.document-number, .executive-order-number, .fr-document-number',
-                date: '.document-details .publish-date, .signing-date, .date-filed',
-                title: '.title, .document-title, .fr-document-title',
-                type: '.document-type, .presidential-document-type'
-            },
-            presidency: {
-                content: '.field-docs-content, .document-content',
-                signature: '.signature-block, .president-signature',
-                number: '.document-number, .identifier',
-                date: '.date-display-single, .doc-date',
-                title: '.field-docs-title, .title',
-                type: '.field-docs-type, .document-type'
-            },
-            archives: {
-                content: '.document-text, .eo-text, .content-text',
-                signature: '.signature-block, .signatory',
-                number: '.document-number, .identifier-number',
-                date: '.sign-date, .document-date',
-                title: '.title-display, .document-title',
-                type: '.document-type, .record-type'
-            },
-            govInfo: {
-                content: '.content-body, .document-text, .full-text',
-                signature: '.signature-block, .sig',
-                number: '.document-id, .doc-number',
-                date: '.document-date, .date',
-                title: '.document-title, .title',
-                type: '.document-type, .doc-type'
-            },
-            courtListener: {
-                content: '.opinion-text, .document-text',
-                signature: '.signature, .judge-signature',
-                number: '.docket-number, .case-number',
-                date: '.date-filed, .decision-date',
-                title: '.case-name, .document-title',
-                type: '.document-type, .filing-type'
+        // Enhanced error handling wrapper
+        const safeExecute = (fn, fallback = null) => {
+            try {
+                return fn();
+            } catch (error) {
+                debug('Error in operation', error.message);
+                return fallback;
             }
         };
 
-        // Try each format until we find content
-        for (const [source, selectors] of Object.entries(formats)) {
-            const content = getText(selectors.content);
-            if (content) {
-                return {
-                    text: content,
-                    signedBy: getText(selectors.signature),
-                    documentNumber: getText(selectors.number),
-                    publishDate: getText(selectors.date),
-                    title: getText(selectors.title),
-                    documentType: getText(selectors.type),
-                    source,
-                    format: source
-                };
+        // Function to clean text content with improved regex handling
+        const cleanText = (text) => {
+            if (!text) return '';
+            
+            // Remove legal disclaimers and navigation elements with proper escaping
+            const disclaimers = [
+                'Legal Status',
+                'This site displays a prototype',
+                'This prototype edition',
+                'The OFR/GPO partnership',
+                'Enter a search term',
+                'Document Details',
+                'Published Document',
+                'Enhanced Content',
+                'Public Inspection',
+                'Table of Contents',
+                'Document Statistics',
+                'Other Formats',
+                'Public Comments',
+                'Billing code',
+                'Filed',
+                '\\[FR Doc\\.',  // Fixed regex pattern
+                'Reader Aids',
+                'Background and more details',
+                'Published Content',
+                'Official Content',
+                'Enhanced Content',
+                'Page \\d+ of \\d+',  // Page numbers
+                '\\d+\\s*FR\\s*\\d+',  // Federal Register citations
+                'Federal Register / Vol\\.?\\s*\\d+,?\\s*No\\.?\\s*\\d+'  // FR headers
+            ];
+            
+            return safeExecute(() => {
+                let cleanedText = text;
+                
+                // Clean each disclaimer pattern safely
+                for (const disclaimer of disclaimers) {
+                    try {
+                        const escapedDisclaimer = disclaimer.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                        const pattern = new RegExp(`.*${escapedDisclaimer}.*(?:\\r?\\n|$)`, 'gi');
+                        cleanedText = cleanedText.replace(pattern, '');
+                    } catch (error) {
+                        debug(`Error cleaning disclaimer: ${disclaimer}`, error.message);
+                    }
+                }
+                
+                // Additional cleaning steps
+                cleanedText = cleanedText
+                    // Remove extra whitespace
+                    .split(/\r?\n/)
+                    .map(line => line.trim())
+                    // Remove empty lines and lines with only numbers/spaces
+                    .filter(line => line && !/^[\s\d]*$/.test(line))
+                    // Remove duplicate spaces
+                    .map(line => line.replace(/\s+/g, ' '))
+                    // Join with newlines
+                    .join('\n')
+                    // Remove multiple consecutive newlines
+                    .replace(/\n{3,}/g, '\n\n')
+                    // Trim final result
+                    .trim();
+                
+                return cleanedText;
+            }, text);  // Return original text as fallback
+        };
+
+        // Helper function to safely get text content with better error handling
+        const getText = (selectors, context = document) => {
+            if (!context) {
+                debug('Null context provided for selectors', selectors);
+                return '';
             }
+
+            const selectorArray = Array.isArray(selectors) ? selectors : [selectors];
+            
+            return safeExecute(() => {
+                for (const selector of selectorArray) {
+                    try {
+                        const elements = context.querySelectorAll(selector);
+                        if (elements && elements.length > 0) {
+                            const text = Array.from(elements)
+                                .map(el => el?.textContent?.trim() || '')
+                                .filter(Boolean)
+                                .join('\n');
+                            
+                            if (text) {
+                                debug(`Found text using selector: ${selector}`, { length: text.length });
+                                return text;
+                            }
+                        }
+                    } catch (selectorError) {
+                        debug(`Error with selector "${selector}"`, selectorError.message);
+                    }
+                }
+                return '';
+            }, '');
+        };
+
+        // Try to find the main document content with more robust error handling
+        const mainContentSelectors = [
+            // Federal Register specific selectors for executive orders
+            '#fulltext_content_area',
+            '.executive-order-content',
+            '.document-content-area .fr-box-official .content-wrapper',
+            '.document-content-area .printed-page-content',
+            // Generic document selectors
+            '.document-content',
+            '.body-content',
+            '.word-content',
+            // Fallback selectors
+            'article',
+            '.main-content',
+            '#main-content'
+        ];
+
+        let mainContent = null;
+        let usedSelector = '';
+        
+        try {
+            for (const selector of mainContentSelectors) {
+                const elements = document.querySelectorAll(selector);
+                if (elements && elements.length > 0) {
+                    mainContent = Array.from(elements);
+                    usedSelector = selector;
+                    debug('Found content using selector', `${selector} (${elements.length} elements)`);
+                    break;
+                }
+            }
+
+            // If no content found with specific selectors, try body as last resort
+            if (!mainContent) {
+                mainContent = [document.body];
+                usedSelector = 'body';
+                debug('Using body as fallback for content', null);
+            }
+        } catch (error) {
+            debug('Error finding main content', error.message);
+            return null;
         }
 
-        // If no predefined format matches, try generic content extraction
-        const mainContent = document.querySelector('main, article, .main-content');
-        if (mainContent) {
-            // Try to extract metadata from any available elements
-            const possibleDateSelectors = [
-                '[class*="date"]',
-                '[class*="time"]',
-                'time',
-                '.meta time'
-            ];
-            const possibleTitleSelectors = [
-                'h1',
-                '.title',
-                '[class*="title"]',
-                '[class*="heading"]'
-            ];
+        // Get document metadata from multiple possible locations
+        const metadataContainers = [
+            '.metadata-section',
+            '.document-metadata',
+            '.document-details',
+            '.document-content-area header'
+        ];
 
-            return {
-                text: mainContent.textContent.trim(),
-                signedBy: getMetadata(['[class*="signature"]', '[class*="signed"]', '.author']),
-                documentNumber: getMetadata(['[class*="number"]', '[class*="id"]', '.identifier']),
-                publishDate: getMetadata(possibleDateSelectors),
-                title: getMetadata(possibleTitleSelectors),
-                documentType: getMetadata(['[class*="type"]', '[class*="category"]']),
-                source: 'generic',
-                format: 'generic'
-            };
+        let metadataSection = null;
+        for (const selector of metadataContainers) {
+            metadataSection = document.querySelector(selector);
+            if (metadataSection) break;
         }
 
-        return null;
+        debug('Metadata section found', metadataSection ? 'Yes' : 'No');
+
+        // Get title from multiple possible locations
+        const title = getText([
+            '.document-title h1',
+            '.title h1',
+            'h1.title',
+            '.title',
+            'header h1',
+            'h1'
+        ]);
+
+        // Get document number from multiple possible locations
+        const documentNumber = getText([
+            '.fr-document-number',
+            '.document-number',
+            '.executive-order-number',
+            '[class*="document-number"]',
+            '[class*="eo-number"]',
+            'header [class*="number"]'
+        ], metadataSection);
+
+        // Get publish date from multiple possible locations
+        const publishDate = getText([
+            '.document-details time',
+            '.publish-date',
+            '.signing-date',
+            '.date-filed',
+            '[class*="date"]',
+            'time',
+            'header time'
+        ], metadataSection);
+
+        // Get document type from multiple possible locations
+        const documentType = getText([
+            '.document-type',
+            '.presidential-document-type',
+            '[class*="document-type"]',
+            '[class*="doc-type"]',
+            'header [class*="type"]'
+        ], metadataSection);
+
+        // Get signature from multiple possible locations
+        const signedBy = getText([
+            '.signature-box',
+            '.president-signature',
+            '.sig-block',
+            '.signature',
+            '[class*="signature"]',
+            '.document-footer [class*="signature"]'
+        ]);
+
+        // Extract and clean the main content text
+        const rawText = mainContent
+            .map(el => el.textContent || '')
+            .join('\n');
+        
+        const cleanedText = cleanText(rawText);
+        debug('Text content length', { raw: rawText.length, cleaned: cleanedText.length });
+
+        // Only return content if we have meaningful text
+        if (!cleanedText || cleanedText.length < 100) {
+            debug('Insufficient content length', cleanedText.length);
+            return null;
+        }
+
+        return {
+            text: cleanedText,
+            title: title || null,
+            documentNumber: documentNumber || null,
+            publishDate: publishDate || null,
+            documentType: documentType || null,
+            signedBy: signedBy || null,
+            debug: {
+                contentLength: cleanedText.length,
+                hasTitle: Boolean(title),
+                hasDocNumber: Boolean(documentNumber),
+                hasDate: Boolean(publishDate),
+                hasType: Boolean(documentType),
+                hasSignature: Boolean(signedBy)
+            }
+        };
     });
 }
 
@@ -245,10 +456,18 @@ async function scrapeOfficialDocuments() {
                     
                     // Get document listings
                     const page = await scraper.acquirePage();
+                    
+                    // Set a longer timeout and wait for content
+                    page.setDefaultTimeout(60000);
+                    
                     await page.goto(url, { 
-                        waitUntil: 'networkidle0',
+                        waitUntil: ['networkidle0', 'domcontentloaded'],
                         timeout: 60000
                     });
+
+                    // Wait for any dynamic content to load
+                    await page.waitForSelector('a[href*="/documents/"], a[href*="/executive-order/"]', { timeout: 30000 })
+                        .catch(() => console.log('Timeout waiting for document links'));
 
                     // Extract document links based on source type
                     const documents = await page.evaluate(() => {
@@ -297,7 +516,7 @@ async function scrapeOfficialDocuments() {
 
                     spinner.text = `Found ${documents.length} documents on ${url}`;
 
-                    // Process each document
+                    // Process each document with improved error handling
                     for (const doc of documents) {
                         try {
                             if (!await isValidDocumentPage(doc.url)) {
@@ -305,17 +524,20 @@ async function scrapeOfficialDocuments() {
                                 continue;
                             }
 
-                            // Extract document content and metadata
+                            // Extract document content and metadata with retries
                             const docPage = await scraper.acquirePage();
-                            await docPage.goto(doc.url, { 
-                                waitUntil: 'networkidle0',
-                                timeout: 60000
-                            });
+                            docPage.setDefaultTimeout(60000);
                             
+                            const pageLoaded = await loadPage(docPage, doc.url);
+                            if (!pageLoaded) {
+                                spinner.warn(`Failed to load page: ${doc.url}`);
+                                continue;
+                            }
+
                             const content = await extractDocumentContent(docPage);
                             
                             if (!content || !content.text) {
-                                spinner.warn(`No content found in ${doc.url}`);
+                                spinner.warn(`No content found in ${doc.url} (Debug: ${JSON.stringify(content?.debug)})`);
                                 continue;
                             }
 

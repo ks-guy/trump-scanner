@@ -1,8 +1,12 @@
-const Chart = require('chart.js');
-const { createCanvas } = require('canvas');
-const path = require('path');
-const fs = require('fs').promises;
-const { logger } = require('../../utils/logger');
+import Chart from 'chart.js/auto';
+import { createCanvas } from 'canvas';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import fs from 'fs/promises';
+import { logger } from '../../utils/logger.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 class VisualizationService {
     constructor() {
@@ -233,4 +237,4 @@ class VisualizationService {
     }
 }
 
-module.exports = VisualizationService; 
+export default VisualizationService; 

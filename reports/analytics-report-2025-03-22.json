@@ -1,0 +1,323 @@
+{
+  "timestamp": "2025-03-22T14:40:05.753Z",
+  "period": {
+    "start": "1970-01-01T00:00:00.000Z",
+    "end": "2025-03-22T14:40:05.741Z"
+  },
+  "summary": {
+    "totalPosts": 5,
+    "totalReplies": 0,
+    "totalLikes": 1080,
+    "totalReposts": 331,
+    "averageEngagement": 319.4,
+    "postsPerDay": 0
+  },
+  "posts": {
+    "peakHours": [
+      {
+        "hour": 9,
+        "count": 5
+      }
+    ],
+    "contentAnalysis": {
+      "topWords": [
+        {
+          "word": "great",
+          "count": 3
+        },
+        {
+          "word": "just",
+          "count": 1
+        },
+        {
+          "word": "meeting",
+          "count": 1
+        },
+        {
+          "word": "with",
+          "count": 1
+        },
+        {
+          "word": "team!",
+          "count": 1
+        },
+        {
+          "word": "#maga",
+          "count": 1
+        },
+        {
+          "word": "fake",
+          "count": 1
+        },
+        {
+          "word": "news",
+          "count": 1
+        },
+        {
+          "word": "media",
+          "count": 1
+        },
+        {
+          "word": "won't",
+          "count": 1
+        },
+        {
+          "word": "tell",
+          "count": 1
+        },
+        {
+          "word": "this,",
+          "count": 1
+        },
+        {
+          "word": "numbers",
+          "count": 1
+        },
+        {
+          "word": "through",
+          "count": 1
+        },
+        {
+          "word": "roof!",
+          "count": 1
+        },
+        {
+          "word": "thank",
+          "count": 1
+        },
+        {
+          "word": "supporters!",
+          "count": 1
+        },
+        {
+          "word": "together",
+          "count": 1
+        },
+        {
+          "word": "will",
+          "count": 1
+        },
+        {
+          "word": "make",
+          "count": 1
+        }
+      ],
+      "averageLength": 11
+    },
+    "averageLength": 60
+  },
+  "engagement": {
+    "engagementByDay": [
+      {
+        "date": "2025-03-17",
+        "likes": 180,
+        "reposts": 52,
+        "replies": 28,
+        "total": 260
+      },
+      {
+        "date": "2025-03-18",
+        "likes": 250,
+        "reposts": 78,
+        "replies": 56,
+        "total": 384
+      },
+      {
+        "date": "2025-03-19",
+        "likes": 300,
+        "reposts": 89,
+        "replies": 45,
+        "total": 434
+      },
+      {
+        "date": "2025-03-20",
+        "likes": 200,
+        "reposts": 67,
+        "replies": 34,
+        "total": 301
+      },
+      {
+        "date": "2025-03-21",
+        "likes": 150,
+        "reposts": 45,
+        "replies": 23,
+        "total": 218
+      }
+    ],
+    "topPosts": [
+      {
+        "likes": 300,
+        "reposts": 89,
+        "replies": 45,
+        "createdAt": "2025-03-19T14:39:01.984Z",
+        "totalEngagement": 434
+      },
+      {
+        "likes": 250,
+        "reposts": 78,
+        "replies": 56,
+        "createdAt": "2025-03-18T14:39:01.984Z",
+        "totalEngagement": 384
+      },
+      {
+        "likes": 200,
+        "reposts": 67,
+        "replies": 34,
+        "createdAt": "2025-03-20T14:39:01.984Z",
+        "totalEngagement": 301
+      },
+      {
+        "likes": 180,
+        "reposts": 52,
+        "replies": 28,
+        "createdAt": "2025-03-17T14:39:01.984Z",
+        "totalEngagement": 260
+      },
+      {
+        "likes": 150,
+        "reposts": 45,
+        "replies": 23,
+        "createdAt": "2025-03-21T14:39:01.984Z",
+        "totalEngagement": 218
+      }
+    ],
+    "averageEngagementRate": 319.4
+  },
+  "trends": {
+    "engagementTrend": [
+      {
+        "week": "2025-W12",
+        "engagement": 1597,
+        "posts": 5,
+        "averageEngagement": 319.4
+      }
+    ],
+    "contentTrends": [
+      {
+        "week": "2025-W12",
+        "topWords": [
+          {
+            "word": "great",
+            "count": 3
+          },
+          {
+            "word": "just",
+            "count": 1
+          },
+          {
+            "word": "meeting",
+            "count": 1
+          },
+          {
+            "word": "with",
+            "count": 1
+          },
+          {
+            "word": "team!",
+            "count": 1
+          },
+          {
+            "word": "#maga",
+            "count": 1
+          },
+          {
+            "word": "fake",
+            "count": 1
+          },
+          {
+            "word": "news",
+            "count": 1
+          },
+          {
+            "word": "media",
+            "count": 1
+          },
+          {
+            "word": "won't",
+            "count": 1
+          },
+          {
+            "word": "tell",
+            "count": 1
+          },
+          {
+            "word": "this,",
+            "count": 1
+          },
+          {
+            "word": "numbers",
+            "count": 1
+          },
+          {
+            "word": "through",
+            "count": 1
+          },
+          {
+            "word": "roof!",
+            "count": 1
+          },
+          {
+            "word": "thank",
+            "count": 1
+          },
+          {
+            "word": "supporters!",
+            "count": 1
+          },
+          {
+            "word": "together",
+            "count": 1
+          },
+          {
+            "word": "will",
+            "count": 1
+          },
+          {
+            "word": "make",
+            "count": 1
+          }
+        ]
+      }
+    ],
+    "postingPatterns": {
+      "byHour": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        5,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "byDay": [
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0
+      ],
+      "byWeek": {
+        "2025-W12": 5
+      }
+    }
+  }
+}

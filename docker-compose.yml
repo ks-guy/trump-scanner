@@ -1,8 +1,8 @@
-version: '3.8'
-
 services:
   app:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     ports:
       - "3000:3000"
     volumes:
@@ -19,7 +19,9 @@ services:
       - trump_scanner_network
 
   scraper:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.scraper
     container_name: trump-scanner
     ports:
       - "9100:9100"  # Expose metrics endpoint
@@ -30,6 +32,7 @@ services:
       - NODE_ENV=production
       - TZ=UTC
       - METRICS_PORT=9100
+      - DATABASE_URL=mysql://scanner_user:scanner_password@db:3306/trump_scanner
     restart: unless-stopped
     deploy:
       resources:
@@ -43,6 +46,8 @@ services:
       - seccomp=unconfined
     networks:
       - trump_scanner_network
+    depends_on:
+      - db
 
   prometheus:
     image: prom/prometheus:latest

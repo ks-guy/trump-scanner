@@ -1,4 +1,4 @@
-FROM node:18-slim
+FROM node:20-slim
 
 # Install Chrome dependencies and FFmpeg
 RUN apt-get update && apt-get install -y \
@@ -31,10 +31,13 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies
-RUN npm install
+RUN npm ci
 
 # Copy source code
-COPY src/ ./src/
+COPY . .
+
+# Generate Prisma client
+RUN npx prisma generate
 
 # Set environment variables
 ENV NODE_ENV=production
@@ -44,4 +47,4 @@ ENV SCRAPER_SERVICE=true
 EXPOSE 3001
 
 # Start the scraper service
-CMD ["node", "src/services/scraper/index.js"] 
+CMD ["npm", "run", "scrape:all"] 

@@ -6,20 +6,41 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider = "mysql"
+  url      = env("DATABASE_URL")
 }
 
-model Post {
-  id        String   @id @default(cuid())
-  text      String
-  timestamp String
-  likes     Int      @default(0)
-  reposts   Int      @default(0)
-  replies   Int      @default(0)
-  platform  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+model Document {
+  id          Int      @id @default(autoincrement())
+  url         String   @unique
+  title       String
+  text        String   @db.Text
+  type        String
+  pdfPath     String?
+  scrapedAt   DateTime
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
 
-  @@unique([text, timestamp])
+model Quote {
+  id          Int      @id @default(autoincrement())
+  text        String   @db.Text
+  speaker     String
+  source      String
+  date        DateTime
+  context     String?  @db.Text
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Analysis {
+  id          Int      @id @default(autoincrement())
+  documentId  Int
+  type        String
+  result      Json
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 } 

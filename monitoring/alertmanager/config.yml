@@ -6,21 +6,16 @@ route:
   group_wait: 10s
   group_interval: 10s
   repeat_interval: 1h
-  receiver: 'email-notifications'
+  receiver: 'web.hook'
 
 receivers:
-  - name: 'email-notifications'
-    email_configs:
-      - to: 'your-email@example.com'
-        from: 'alertmanager@your-domain.com'
-        smarthost: 'smtp.gmail.com:587'
-        auth_username: 'your-email@gmail.com'
-        auth_identity: 'your-email@gmail.com'
-        auth_password: 'your-app-specific-password'
+  - name: 'web.hook'
+    webhook_configs:
+      - url: 'http://127.0.0.1:5001/'
 
 inhibit_rules:
   - source_match:
       severity: 'critical'
     target_match:
       severity: 'warning'
-    equal: ['alertname'] 
+    equal: ['alertname', 'dev', 'instance'] 

@@ -1,0 +1,42 @@
+{
+  "sources": {
+    "news": [
+      "https://www.foxnews.com/politics",
+      "https://www.breitbart.com/politics",
+      "https://nypost.com/tag/donald-trump",
+      "https://www.newsmax.com/politics"
+    ],
+    "social": [
+      "https://truthsocial.com/@realDonaldTrump",
+      "https://web.archive.org/web/*/twitter.com/realDonaldTrump"
+    ],
+    "campaign": [
+      "https://www.donaldjtrump.com/news",
+      "https://www.donaldtrump.com/speeches"
+    ],
+    "transcripts": [
+      "https://www.rev.com/blog/transcript-category/donald-trump-transcripts",
+      "https://www.c-span.org/person/?donaldtrump"
+    ],
+    "legal": [
+      "https://www.courtlistener.com/docket/",
+      "https://www.documentcloud.org/public/search/trump"
+    ]
+  },
+  "config": {
+    "maxConcurrent": 5,
+    "requestDelay": {
+      "min": 2000,
+      "max": 5000
+    },
+    "maxRequestsPerDomain": 100,
+    "userAgentRotation": true,
+    "proxyRotation": true,
+    "retryAttempts": 3,
+    "followRedirects": true,
+    "respectRobotsTxt": true,
+    "maxQuotesPerPage": 50,
+    "minQuoteLength": 10,
+    "maxQuoteLength": 1000
+  }
+}
