@@ -148,12 +148,24 @@ class BackupService {
             const { execSync } = require('child_process');
             const dumpFile = path.join(this.backupDir, 'temp_dump.sql');
             
-            execSync(`mysqldump -u ${process.env.DB_USER} -p${process.env.DB_PASSWORD} ${process.env.DB_NAME} > ${dumpFile}`);
+            // Use environment variables for credentials
+            const dbUser = process.env.DB_USER || 'dummy_user';
+            const dbPassword = process.env.DB_PASSWORD || 'dummy_password';
+            const dbName = process.env.DB_NAME || 'trump_scanner';
             
-            const dump = await fs.readFile(dumpFile);
-            await fs.unlink(dumpFile);
+            // Create a temporary credentials file
+            const credentialsFile = path.join(this.backupDir, '.my.cnf');
+            await fs.writeFile(credentialsFile, `[client]\nuser=${dbUser}\npassword=${dbPassword}`);
             
-            return dump;
+            try {
+                execSync(`mysqldump --defaults-file=${credentialsFile} ${dbName} > ${dumpFile}`);
+                const dump = await fs.readFile(dumpFile);
+                await fs.unlink(dumpFile);
+                return dump;
+            } finally {
+                // Clean up credentials file
+                await fs.unlink(credentialsFile);
+            }
         } catch (error) {
             logger.error('Error creating database dump:', error);
             throw new Error('Failed to create database dump');
@@ -180,8 +192,23 @@ class BackupService {
         // This is a placeholder for MySQL restore
         try {
             const { execSync } = require('child_process');
-            execSync(`mysql -u ${process.env.DB_USER} -p${process.env.DB_PASSWORD} ${process.env.DB_NAME} < ${dumpFile}`);
-            return true;
+            
+            // Use environment variables for credentials
+            const dbUser = process.env.DB_USER || 'dummy_user';
+            const dbPassword = process.env.DB_PASSWORD || 'dummy_password';
+            const dbName = process.env.DB_NAME || 'trump_scanner';
+            
+            // Create a temporary credentials file
+            const credentialsFile = path.join(this.backupDir, '.my.cnf');
+            await fs.writeFile(credentialsFile, `[client]\nuser=${dbUser}\npassword=${dbPassword}`);
+            
+            try {
+                execSync(`mysql --defaults-file=${credentialsFile} ${dbName} < ${dumpFile}`);
+                return true;
+            } finally {
+                // Clean up credentials file
+                await fs.unlink(credentialsFile);
+            }
         } catch (error) {
             logger.error('Error restoring database:', error);
             throw new Error('Failed to restore database');

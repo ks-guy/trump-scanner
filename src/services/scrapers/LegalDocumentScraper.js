@@ -246,7 +246,7 @@ export class LegalDocumentScraper {
             try {
                 // Try using ScrapeOps API first
                 try {
-                    const apiUrl = `https://proxy.scrapeops.io/v1/?api_key=${process.env.SCRAPEOPS_API_KEY}&url=${encodeURIComponent(url)}`;
+                    const apiUrl = `https://proxy.scrapeops.io/v1/?api_key=${process.env.SCRAPEOPS_API_KEY || 'your_scrapeops_api_key'}&url=${encodeURIComponent(url)}`;
                     const response = await fetch(apiUrl);
                     const html = await response.text();
 
