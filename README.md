@@ -1,21 +1,21 @@
-# Trump Scanner 3
+# Trump Scanner
 
 A document scraping and analysis system with comprehensive monitoring and logging.
 
 ## System Requirements
 
-- Docker Engine 20.10+
-- Docker Compose 2.0+
-- 4GB RAM minimum (8GB recommended)
-- 20GB free disk space
-- Linux/Unix-based system (Windows requires WSL2)
+* Docker Engine 20.10+
+* Docker Compose 2.0+
+* 4GB RAM minimum (8GB recommended)
+* 20GB free disk space
+* Linux/Unix-based system (Windows requires WSL2)
 
 ## Quick Start
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/trump-scanner-3.git
-cd trump-scanner-3
+git clone https://github.com/ks-guy/trump-scanner.git
+cd trump-scanner
 ```
 
 2. Set up the environment:
@@ -34,20 +34,48 @@ docker-compose up -d
 
 ## Service URLs
 
-- Main Application: http://localhost:3000
-- Monitoring:
-  - Grafana: http://localhost:3001 (admin/admin123)
-  - Prometheus: http://localhost:9090
-  - AlertManager: http://localhost:9093
-- Logging:
-  - Kibana: http://localhost:5601
-  - Elasticsearch: http://localhost:9200
-  - Logstash: http://localhost:9600
+* Main Application: http://localhost:3000
+* Monitoring:
+  * Grafana: http://localhost:3001 (admin/admin123)
+  * Prometheus: http://localhost:9090
+  * AlertManager: http://localhost:9093
+* Logging:
+  * Kibana: http://localhost:5601
+  * Elasticsearch: http://localhost:9200
+  * Logstash: http://localhost:9600
+* Database:
+  * MySQL: localhost:3306
+* Cache:
+  * Redis: localhost:6379
+* Media:
+  * MeTube: http://localhost:8081
+
+## Running Services
+
+1. Core Services:
+   - Main Application (Node.js)
+   - Scraper Service
+   - Database (MySQL)
+   - Cache (Redis)
+
+2. Monitoring Stack:
+   - Grafana (Metrics visualization)
+   - Prometheus (Metrics collection)
+   - AlertManager (Alert management)
+
+3. Logging Stack:
+   - Elasticsearch (Log storage)
+   - Logstash (Log processing)
+   - Kibana (Log visualization)
+   - Filebeat (Log collection)
+
+4. Media Services:
+   - MeTube (Media downloader)
 
 ## Directory Structure
 
 ```
-trump-scanner-3/
+trump-scanner/
 ├── src/                    # Source code
 ├── documents/              # Scraped documents
 ├── data/                  # Application data
@@ -65,18 +93,16 @@ trump-scanner-3/
 ## Configuration
 
 1. Environment Variables:
-   - Copy `.env.example` to `.env`
-   - Update variables as needed
-
+   * Copy `.env.example` to `.env`
+   * Update variables as needed
 2. Monitoring Setup:
-   - Update email settings in `monitoring/alertmanager/config.yml`
-   - Customize alert rules in `monitoring/prometheus/rules/`
-   - Adjust Grafana dashboards in `monitoring/grafana/provisioning/`
-
+   * Update email settings in `monitoring/alertmanager/config.yml`
+   * Customize alert rules in `monitoring/prometheus/rules/`
+   * Adjust Grafana dashboards in `monitoring/grafana/provisioning/`
 3. Logging Setup:
-   - Configure log retention in `monitoring/elasticsearch/`
-   - Adjust log patterns in `monitoring/logstash/pipeline/`
-   - Modify log shipping in `monitoring/filebeat/filebeat.yml`
+   * Configure log retention in `monitoring/elasticsearch/`
+   * Adjust log patterns in `monitoring/logstash/pipeline/`
+   * Modify log shipping in `monitoring/filebeat/filebeat.yml`
 
 ## Deployment
 
@@ -84,11 +110,6 @@ trump-scanner-3/
 
 1. System Preparation:
 ```bash
-# Install Docker and Docker Compose
-curl -fsSL https://get.docker.com | sh
-sudo curl -L "https://github.com/docker/compose/releases/download/v2.23.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-sudo chmod +x /usr/local/bin/docker-compose
-
 # Set up system limits
 echo "vm.max_map_count=262144" | sudo tee -a /etc/sysctl.conf
 sudo sysctl -w vm.max_map_count=262144
@@ -104,8 +125,8 @@ chmod -R 755 documents data logs
 
 1. Clone and Setup:
 ```bash
-git clone https://github.com/yourusername/trump-scanner-3.git
-cd trump-scanner-3
+git clone https://github.com/ks-guy/trump-scanner.git
+cd trump-scanner
 ./setup-logging.sh
 ```
 
@@ -198,4 +219,8 @@ sudo chown root monitoring/filebeat/filebeat.yml
 
 ## License
 
-[Your License Here] 
+MIT
+
+## About
+
+A comprehensive system for collecting, analyzing, and verifying Trump-related quotes and documents from various sources. 
