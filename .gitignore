@@ -1,0 +1,35 @@
+# Environment variables
+.env
+.env.*
+
+# Dependencies
+node_modules/
+package-lock.json
+
+# Debug files
+debug/
+*.log
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Backup files
+backups/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Project specific
+proxy.txt
+*.pdf
+documents/
+eng.traineddata

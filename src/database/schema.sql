@@ -1,3 +1,7 @@
+-- Set the character set and collation
+SET NAMES utf8mb4;
+SET FOREIGN_KEY_CHECKS = 0;
+
 -- Create source_categories table
 CREATE TABLE IF NOT EXISTS source_categories (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -11,31 +15,31 @@ CREATE TABLE IF NOT EXISTS source_categories (
 CREATE TABLE IF NOT EXISTS sources (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
-    url VARCHAR(2048) NOT NULL,
+    url VARCHAR(768) NOT NULL,
     category_id INT,
     is_active BOOLEAN DEFAULT TRUE,
     requires_proxy BOOLEAN DEFAULT FALSE,
     rate_limit_per_hour INT DEFAULT 100,
-    last_scraped TIMESTAMP,
+    last_scraped TIMESTAMP NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (category_id) REFERENCES source_categories(id),
-    UNIQUE KEY unique_source_url (url)
+    UNIQUE KEY unique_source_url (url(768))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Create archive_sources table
 CREATE TABLE IF NOT EXISTS archive_sources (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    original_url VARCHAR(2048) NOT NULL,
-    archive_url VARCHAR(2048) NOT NULL,
-    archive_date TIMESTAMP,
+    original_url VARCHAR(768) NOT NULL,
+    archive_url VARCHAR(768) NOT NULL,
+    archive_date TIMESTAMP NULL,
     snapshot_id VARCHAR(255),
     is_accessible BOOLEAN DEFAULT TRUE,
-    last_checked TIMESTAMP,
+    last_checked TIMESTAMP NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY unique_archive_url (archive_url),
-    INDEX idx_original_url (original_url(255))
+    UNIQUE KEY unique_archive_url (archive_url(768)),
+    INDEX idx_original_url (original_url(768))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Create articles table
@@ -43,45 +47,29 @@ CREATE TABLE IF NOT EXISTS articles (
     id INT AUTO_INCREMENT PRIMARY KEY,
     source_id INT,
     archive_source_id INT,
-    source_url VARCHAR(2048) NOT NULL,
+    url VARCHAR(768) NOT NULL,
     title VARCHAR(512),
-    content LONGTEXT NOT NULL,
+    content TEXT,
     author VARCHAR(255),
-    published_date TIMESTAMP,
-    scraped_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    html_content LONGTEXT,
-    metadata JSON,
-    is_paywalled BOOLEAN DEFAULT FALSE,
-    is_archived BOOLEAN DEFAULT FALSE,
-    archive_date TIMESTAMP,
-    sentiment_score FLOAT,
-    topic_categories JSON,
+    published_date TIMESTAMP NULL,
+    scraped_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (source_id) REFERENCES sources(id),
     FOREIGN KEY (archive_source_id) REFERENCES archive_sources(id),
-    INDEX idx_source_url (source_url(255)),
-    INDEX idx_published_date (published_date),
-    INDEX idx_archive_date (archive_date),
-    FULLTEXT INDEX idx_content (content)
+    UNIQUE KEY unique_article_url (url(768))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Create quotes table
 CREATE TABLE IF NOT EXISTS quotes (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    article_id INT NOT NULL,
+    article_id INT,
     quote_text TEXT NOT NULL,
-    context_before TEXT,
-    context_after TEXT,
-    speaker VARCHAR(255),
-    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    sentiment_score FLOAT,
-    topic_categories JSON,
-    is_verified BOOLEAN DEFAULT FALSE,
-    verification_source VARCHAR(255),
+    context TEXT,
+    timestamp TIMESTAMP NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (article_id) REFERENCES articles(id) ON DELETE CASCADE,
+    FOREIGN KEY (article_id) REFERENCES articles(id),
     FULLTEXT INDEX idx_quote_text (quote_text)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -90,7 +78,7 @@ CREATE TABLE IF NOT EXISTS scraping_logs (
     id INT AUTO_INCREMENT PRIMARY KEY,
     source_id INT,
     archive_source_id INT,
-    url VARCHAR(2048) NOT NULL,
+    url VARCHAR(768) NOT NULL,
     status_code INT,
     error_message TEXT,
     error_type VARCHAR(50),
@@ -98,16 +86,16 @@ CREATE TABLE IF NOT EXISTS scraping_logs (
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (source_id) REFERENCES sources(id),
     FOREIGN KEY (archive_source_id) REFERENCES archive_sources(id),
-    INDEX idx_url (url(255)),
+    INDEX idx_url (url(768)),
     INDEX idx_timestamp (timestamp)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Create rate_limits table
 CREATE TABLE IF NOT EXISTS rate_limits (
     domain VARCHAR(255) NOT NULL,
-    last_request TIMESTAMP,
+    last_request TIMESTAMP NULL,
     request_count INT DEFAULT 0,
-    hour_start TIMESTAMP,
+    hour_start TIMESTAMP NULL,
     PRIMARY KEY (domain)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -115,8 +103,60 @@ CREATE TABLE IF NOT EXISTS rate_limits (
 CREATE TABLE IF NOT EXISTS robots_cache (
     domain VARCHAR(255) NOT NULL,
     rules TEXT,
-    last_updated TIMESTAMP,
+    last_updated TIMESTAMP NULL,
     PRIMARY KEY (domain)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Create proxy_pool table
+CREATE TABLE IF NOT EXISTS proxy_pool (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    proxy_url VARCHAR(255) NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE,
+    last_used TIMESTAMP NULL,
+    success_rate FLOAT DEFAULT 0,
+    total_requests INT DEFAULT 0,
+    failed_requests INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_proxy_url (proxy_url)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Create media_content table
+CREATE TABLE IF NOT EXISTS media_content (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    article_id INT,
+    source_url VARCHAR(768) NOT NULL,
+    media_type ENUM('video', 'audio', 'image') NOT NULL,
+    title VARCHAR(512),
+    description TEXT,
+    duration INT,
+    thumbnail_url VARCHAR(768),
+    storage_path VARCHAR(768),
+    file_size BIGINT,
+    format VARCHAR(50),
+    resolution VARCHAR(50),
+    bitrate INT,
+    is_downloaded BOOLEAN DEFAULT FALSE,
+    download_status VARCHAR(50),
+    last_attempted_download TIMESTAMP NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (article_id) REFERENCES articles(id) ON DELETE CASCADE,
+    INDEX idx_source_url (source_url(768)),
+    INDEX idx_media_type (media_type),
+    INDEX idx_download_status (download_status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Create quote_media table
+CREATE TABLE IF NOT EXISTS quote_media (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    quote_id INT NOT NULL,
+    media_content_id INT NOT NULL,
+    timestamp_start INT,
+    timestamp_end INT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (quote_id) REFERENCES quotes(id) ON DELETE CASCADE,
+    FOREIGN KEY (media_content_id) REFERENCES media_content(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Create scraping_stats table
@@ -135,73 +175,6 @@ CREATE TABLE IF NOT EXISTS scraping_stats (
     UNIQUE KEY unique_source_date (source_id, archive_source_id, date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Create proxy_pool table
-CREATE TABLE IF NOT EXISTS proxy_pool (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    proxy_url VARCHAR(255) NOT NULL,
-    is_active BOOLEAN DEFAULT TRUE,
-    last_used TIMESTAMP,
-    success_rate FLOAT DEFAULT 0,
-    total_requests INT DEFAULT 0,
-    failed_requests INT DEFAULT 0,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY unique_proxy_url (proxy_url)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Create quote_verifications table
-CREATE TABLE IF NOT EXISTS quote_verifications (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    quote_id INT NOT NULL,
-    verified_by VARCHAR(255),
-    verification_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    verification_source VARCHAR(255),
-    verification_notes TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (quote_id) REFERENCES quotes(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Create media_content table
-CREATE TABLE IF NOT EXISTS media_content (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    article_id INT,
-    source_url VARCHAR(2048) NOT NULL,
-    media_type ENUM('video', 'audio', 'image') NOT NULL,
-    title VARCHAR(512),
-    description TEXT,
-    duration INT, -- in seconds for video/audio
-    thumbnail_url VARCHAR(2048),
-    storage_path VARCHAR(2048),
-    file_size BIGINT,
-    format VARCHAR(50),
-    resolution VARCHAR(50),
-    bitrate INT,
-    is_downloaded BOOLEAN DEFAULT FALSE,
-    download_status VARCHAR(50),
-    last_attempted_download TIMESTAMP,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (article_id) REFERENCES articles(id) ON DELETE CASCADE,
-    INDEX idx_source_url (source_url(255)),
-    INDEX idx_media_type (media_type),
-    INDEX idx_download_status (download_status)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Create quote_media table (linking quotes to media content)
-CREATE TABLE IF NOT EXISTS quote_media (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    quote_id INT NOT NULL,
-    media_content_id INT NOT NULL,
-    start_time INT, -- timestamp in seconds where quote starts
-    end_time INT,   -- timestamp in seconds where quote ends
-    transcript TEXT,
-    confidence_score FLOAT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (quote_id) REFERENCES quotes(id) ON DELETE CASCADE,
-    FOREIGN KEY (media_content_id) REFERENCES media_content(id) ON DELETE CASCADE,
-    UNIQUE KEY unique_quote_media (quote_id, media_content_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
 -- Create media_download_queue table
 CREATE TABLE IF NOT EXISTS media_download_queue (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -218,14 +191,13 @@ CREATE TABLE IF NOT EXISTS media_download_queue (
     INDEX idx_priority (priority)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Create media_storage table (for tracking storage locations)
+-- Create media_storage table
 CREATE TABLE IF NOT EXISTS media_storage (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    storage_type ENUM('local', 's3', 'cloudfront', 'other') NOT NULL,
-    base_path VARCHAR(2048) NOT NULL,
-    is_active BOOLEAN DEFAULT TRUE,
+    storage_type VARCHAR(50) NOT NULL,
+    base_path VARCHAR(768) NOT NULL,
     max_storage_size BIGINT,
-    current_storage_used BIGINT,
+    current_usage BIGINT DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY unique_storage_type (storage_type)
@@ -244,8 +216,32 @@ CREATE TABLE IF NOT EXISTS media_processing_logs (
     INDEX idx_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Create legal_documents table
+CREATE TABLE IF NOT EXISTS legal_documents (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    source_id INT,
+    url VARCHAR(768) NOT NULL,
+    title VARCHAR(512),
+    case_number VARCHAR(255),
+    court VARCHAR(255),
+    filing_date TIMESTAMP NULL,
+    content TEXT,
+    metadata JSON,
+    pdf_urls JSON,
+    downloaded_pdfs JSON,
+    pdf_content JSON,
+    scraped_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (source_id) REFERENCES sources(id),
+    UNIQUE KEY unique_document_url (url(768)),
+    INDEX idx_case_number (case_number),
+    INDEX idx_court (court),
+    INDEX idx_filing_date (filing_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Insert default source categories
-INSERT INTO source_categories (name, description) VALUES
+INSERT IGNORE INTO source_categories (name, description) VALUES
 ('Mainstream News', 'Traditional mainstream news sources'),
 ('Conservative News', 'Conservative-leaning news sources'),
 ('Liberal News', 'Liberal-leaning news sources'),
@@ -258,5 +254,7 @@ INSERT INTO source_categories (name, description) VALUES
 ('Archived Content', 'Content from archive.org and other archival sources');
 
 -- Insert default media storage location
-INSERT INTO media_storage (storage_type, base_path, max_storage_size) VALUES
-('local', './media_storage', 10737418240); -- 10GB default storage limit 
+INSERT IGNORE INTO media_storage (storage_type, base_path, max_storage_size) VALUES
+('local', './media_storage', 10737418240); -- 10GB default storage limit
+
+SET FOREIGN_KEY_CHECKS = 1; 

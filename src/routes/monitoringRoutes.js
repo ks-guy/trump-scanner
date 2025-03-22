@@ -23,4 +23,7 @@ router.get('/metrics/application', monitoringController.getApplicationMetrics);
 router.get('/metrics/database', monitoringController.getDatabaseMetrics);
 router.get('/metrics/storage', monitoringController.getStorageMetrics);
 
+// Alerts endpoint
+router.get('/alerts', monitoringController.getAlerts);
+
 module.exports = router; 

@@ -2,25 +2,16 @@ const express = require('express');
 const router = express.Router();
 const backupController = require('../controllers/backupController');
 const { authenticate } = require('../middleware/auth');
-const { rateLimit } = require('../middleware/rateLimit');
+const { validateBackupCreate } = require('../middleware/validation');
 
-// Apply authentication and rate limiting to all routes
+// Apply authentication middleware to all backup routes
 router.use(authenticate);
-router.use(rateLimit);
 
-// Create a new backup
-router.post('/', backupController.createBackup);
-
-// List all backups
-router.get('/', backupController.listBackups);
-
-// Download a backup
-router.get('/:backupId/download', backupController.downloadBackup);
-
-// Restore from a backup
-router.post('/:backupId/restore', backupController.restoreBackup);
-
-// Delete a backup
-router.delete('/:backupId', backupController.deleteBackup);
+// Backup endpoints
+router.get('/', backupController.getBackups);
+router.post('/', validateBackupCreate, backupController.createBackup);
+router.post('/:id/restore', backupController.restoreBackup);
+router.delete('/:id', backupController.deleteBackup);
+router.get('/:id/download', backupController.downloadBackup);
 
 module.exports = router; 

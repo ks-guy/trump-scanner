@@ -5,6 +5,8 @@ const compression = require('compression');
 const { logger } = require('./utils/logger');
 const mediaRoutes = require('./routes/mediaRoutes');
 const searchRoutes = require('./routes/searchRoutes');
+const metricsRoutes = require('./routes/metricsRoutes');
+const systemMetrics = require('./services/monitoring/SystemMetricsService');
 const cacheWarmingService = require('./services/cache/CacheWarmingService');
 const { initializeDatabase } = require('./database/connection');
 
@@ -15,10 +17,17 @@ app.use(helmet());
 app.use(cors());
 app.use(compression());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // Routes
 app.use('/api/media', mediaRoutes);
 app.use('/api/search', searchRoutes);
+app.use('/api/metrics', metricsRoutes);
+
+// Start system metrics collection
+systemMetrics.start().catch(err => {
+    logger.error('Failed to start system metrics collection:', err);
+});
 
 // Error handling middleware
 app.use((err, req, res, next) => {

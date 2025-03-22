@@ -1,4 +1,4 @@
-const monitoringService = require('../services/monitoring/MonitoringService');
+const { monitoringService } = require('../services/monitoring');
 const { logger } = require('../utils/logger');
 
 class MonitoringController {
@@ -80,6 +80,18 @@ class MonitoringController {
         } catch (error) {
             logger.error('Error getting storage metrics:', error);
             res.status(500).json({ error: 'Failed to get storage metrics' });
+        }
+    }
+
+    // Get recent alerts
+    async getAlerts(req, res) {
+        try {
+            const { limit = 100 } = req.query;
+            const alerts = await monitoringService.getRecentAlerts(parseInt(limit));
+            res.json(alerts);
+        } catch (error) {
+            logger.error('Error getting alerts:', error);
+            res.status(500).json({ error: 'Failed to get alerts' });
         }
     }
 }

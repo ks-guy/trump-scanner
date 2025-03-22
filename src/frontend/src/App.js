@@ -1,24 +1,27 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { ThemeProvider, createTheme } from '@mui/material/styles';
-import CssBaseline from '@mui/material/CssBaseline';
-import Box from '@mui/material/Box';
-import Layout from './components/Layout';
-import Dashboard from './pages/Dashboard';
-import MediaManagement from './pages/MediaManagement';
-import Search from './pages/Search';
-import Backup from './pages/Backup';
-import Settings from './pages/Settings';
+import { ThemeProvider, CssBaseline, Box } from '@mui/material';
+import { createTheme } from '@mui/material/styles';
 
-// Create a theme instance
+// Import pages
+import Dashboard from './pages/Dashboard';
+import Search from './pages/Search';
+import MediaManagement from './pages/MediaManagement';
+import Backup from './pages/Backup';
+import MetricsDashboard from './components/MetricsDashboard/MetricsDashboard';
+
+// Import components
+import Layout from './components/Layout';
+
+// Create theme
 const theme = createTheme({
   palette: {
     mode: 'dark',
     primary: {
-      main: '#1976d2',
+      main: '#90caf9',
     },
     secondary: {
-      main: '#dc004e',
+      main: '#f48fb1',
     },
     background: {
       default: '#121212',
@@ -27,25 +30,15 @@ const theme = createTheme({
   },
   typography: {
     fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
-    h1: {
-      fontSize: '2.5rem',
-      fontWeight: 500,
-    },
-    h2: {
-      fontSize: '2rem',
-      fontWeight: 500,
-    },
-    h3: {
-      fontSize: '1.75rem',
+    h4: {
       fontWeight: 500,
     },
   },
   components: {
-    MuiCard: {
+    MuiButton: {
       styleOverrides: {
         root: {
-          borderRadius: 12,
-          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+          textTransform: 'none',
         },
       },
     },
@@ -62,10 +55,10 @@ function App() {
             <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
               <Routes>
                 <Route path="/" element={<Dashboard />} />
-                <Route path="/media" element={<MediaManagement />} />
+                <Route path="/metrics" element={<MetricsDashboard />} />
                 <Route path="/search" element={<Search />} />
+                <Route path="/media" element={<MediaManagement />} />
                 <Route path="/backup" element={<Backup />} />
-                <Route path="/settings" element={<Settings />} />
               </Routes>
             </Box>
           </Layout>
