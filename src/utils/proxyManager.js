@@ -19,14 +19,31 @@ export class ProxyManager {
                 .map(line => {
                     const [host, port] = line.split(':');
                     return { host, port: parseInt(port, 10) };
-                });
+                })
+                .filter(proxy => this.validateProxy(proxy));
 
-            logger.info(`Loaded ${this.proxies.length} proxies from ${this.proxyFilePath}`);
+            logger.info(`Loaded ${this.proxies.length} valid proxies from ${this.proxyFilePath}`);
             return this.proxies.length > 0;
         } catch (error) {
             logger.error('Error loading proxies:', error);
             return false;
         }
+    }
+
+    validateProxy(proxy) {
+        if (!proxy.host || !proxy.port) {
+            logger.warn('Invalid proxy format: missing host or port');
+            return false;
+        }
+        if (proxy.port < 1 || proxy.port > 65535) {
+            logger.warn('Invalid proxy port:', proxy.port);
+            return false;
+        }
+        if (!/^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(proxy.host)) {
+            logger.warn('Invalid proxy host format:', proxy.host);
+            return false;
+        }
+        return true;
     }
 
     getNextProxy() {
@@ -52,6 +69,8 @@ export class ProxyManager {
         if (!proxy) {
             return null;
         }
+        // Mask the proxy details in logs
+        logger.debug('Using proxy:', `${proxy.host}:****`);
         return `${proxy.host}:${proxy.port}`;
     }
 } 
