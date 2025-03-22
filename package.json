@@ -31,7 +31,8 @@
     "puppeteer-extra-plugin-stealth": "^2.11.2",
     "sqlite3": "^5.1.7",
     "tesseract.js": "^6.0.0",
-    "winston": "^3.11.0"
+    "winston": "^3.11.0",
+    "chartjs-node-canvas": "^4.1.6"
   },
   "devDependencies": {
     "eslint": "^9.23.0",

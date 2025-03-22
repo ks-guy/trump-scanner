@@ -1,9 +1,11 @@
 const TruthSocialAnalytics = require('../services/analytics/TruthSocialAnalytics');
+const VisualizationService = require('../services/analytics/VisualizationService');
 const { logger } = require('../utils/logger');
 
 async function generateAnalytics() {
     try {
         const analytics = new TruthSocialAnalytics();
+        const visualizationService = new VisualizationService();
         
         // Generate reports for different time periods
         const periods = [
@@ -29,6 +31,11 @@ async function generateAnalytics() {
             logger.info(`Total posts: ${report.summary.totalPosts}`);
             logger.info(`Average engagement: ${report.summary.averageEngagement.toFixed(2)}`);
             logger.info(`Posts per day: ${report.summary.postsPerDay}`);
+
+            // Generate visualizations for the report
+            logger.info('Generating visualizations...');
+            await visualizationService.generateVisualizations(report);
+            logger.info('Visualizations generated successfully');
         }
 
     } catch (error) {
