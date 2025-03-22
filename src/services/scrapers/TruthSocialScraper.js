@@ -12,6 +12,7 @@ class TruthSocialScraper {
                 max: 5000
             },
             maxRetries: 3,
+            defaultUsername: 'realDonaldTrump', // Trump's official Truth Social handle
             ...config
         };
         this.browser = null;
@@ -123,9 +124,10 @@ class TruthSocialScraper {
         }
     }
 
-    async scrapeProfile(username = 'realDonaldTrump', options = {}) {
+    async scrapeProfile(username = null, options = {}) {
+        const targetUsername = username || this.config.defaultUsername;
         try {
-            const url = `https://truthsocial.com/@${username}`;
+            const url = `https://truthsocial.com/@${targetUsername}`;
             logger.info(`Navigating to ${url}`);
             
             // Try to load the page with retries
