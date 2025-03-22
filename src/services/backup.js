@@ -10,13 +10,20 @@ class BackupService {
     constructor() {
         this.backupDir = process.env.BACKUP_DIR || path.join(process.cwd(), 'backups');
         this.ensureBackupDir();
+        this.maxBackupAge = 30 * 24 * 60 * 60 * 1000; // 30 days in milliseconds
     }
 
     async ensureBackupDir() {
         try {
             await fs.access(this.backupDir);
+            // Check directory permissions
+            const stats = await fs.stat(this.backupDir);
+            if ((stats.mode & 0o777) !== 0o700) {
+                logger.warn('Backup directory has incorrect permissions. Setting to 700...');
+                await fs.chmod(this.backupDir, 0o700);
+            }
         } catch (error) {
-            await fs.mkdir(this.backupDir, { recursive: true });
+            await fs.mkdir(this.backupDir, { recursive: true, mode: 0o700 });
         }
     }
 
@@ -39,8 +46,8 @@ class BackupService {
         const filePath = path.join(this.backupDir, fileName);
 
         try {
-            // Create a write stream
-            const output = createWriteStream(filePath);
+            // Create a write stream with secure permissions
+            const output = createWriteStream(filePath, { mode: 0o600 });
             const archive = archiver('zip', {
                 zlib: { level: 9 } // Maximum compression
             });
@@ -49,29 +56,80 @@ class BackupService {
             archive.pipe(output);
 
             // Add database dump
-            const dbDump = await this.createDatabaseDump();
-            archive.append(dbDump, { name: 'database.sql' });
+            const dump = await this.createDatabaseDump();
+            archive.append(dump, { name: 'database.sql' });
 
-            // Add media files
-            const mediaDir = process.env.MEDIA_DIR || path.join(process.cwd(), 'media');
-            archive.directory(mediaDir, 'media');
+            // Add configuration files (excluding sensitive data)
+            const configFiles = [
+                'package.json',
+                'src/config/sources.js',
+                'src/database/schema.sql'
+            ];
+
+            for (const file of configFiles) {
+                try {
+                    const filePath = path.join(process.cwd(), file);
+                    const stats = await fs.stat(filePath);
+                    if (stats.isFile()) {
+                        archive.file(filePath, { name: file });
+                    }
+                } catch (error) {
+                    logger.warn(`Could not add ${file} to backup:`, error);
+                }
+            }
 
             // Finalize the archive
             await archive.finalize();
+            await new Promise((resolve, reject) => {
+                output.on('close', resolve);
+                output.on('error', reject);
+            });
 
-            // Get the size of the backup file
-            const stats = await fs.stat(filePath);
+            // Set secure file permissions
+            await fs.chmod(filePath, 0o600);
 
-            // Save backup metadata to database
-            const backup = await db.query(
-                'INSERT INTO backups (id, file_path, note, size) VALUES (?, ?, ?, ?) RETURNING *',
-                [backupId, filePath, note, stats.size]
+            // Record backup in database
+            const fileStats = await fs.stat(filePath);
+            await db.query(
+                'INSERT INTO backups (id, file_path, size, note, created_at) VALUES (?, ?, ?, ?, NOW())',
+                [backupId, filePath, fileStats.size, note]
             );
 
-            return backup;
+            // Clean up old backups
+            await this.cleanupOldBackups();
+
+            return backupId;
         } catch (error) {
             logger.error('Error creating backup:', error);
+            // Clean up failed backup file if it exists
+            try {
+                await fs.unlink(filePath);
+            } catch (unlinkError) {
+                logger.error('Error cleaning up failed backup file:', unlinkError);
+            }
             throw new Error('Failed to create backup');
+        }
+    }
+
+    async cleanupOldBackups() {
+        try {
+            const cutoffDate = new Date(Date.now() - this.maxBackupAge);
+            const oldBackups = await db.query(
+                'SELECT id, file_path FROM backups WHERE created_at < ?',
+                [cutoffDate]
+            );
+
+            for (const backup of oldBackups) {
+                try {
+                    await fs.unlink(backup.file_path);
+                    await db.query('DELETE FROM backups WHERE id = ?', [backup.id]);
+                    logger.info(`Cleaned up old backup: ${backup.id}`);
+                } catch (error) {
+                    logger.error(`Error cleaning up backup ${backup.id}:`, error);
+                }
+            }
+        } catch (error) {
+            logger.error('Error cleaning up old backups:', error);
         }
     }
 
