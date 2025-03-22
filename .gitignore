@@ -1,35 +1,44 @@
+# Node
+node_modules/
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+
 # Environment variables
 .env
 .env.*
 
-# Dependencies
-node_modules/
-package-lock.json
-
-# Debug files
-debug/
+# Logs
+logs/
 *.log
 
-# Database files
-*.db
-*.sqlite
-*.sqlite3
+# Data
+data/
+documents/
 
-# Backup files
-backups/
+# Docker volumes
+mysql_data/
+redis_data/
+prometheus_data/
+grafana_data/
+elasticsearch_data/
 
-# IDE files
+# IDE
 .vscode/
 .idea/
 *.swp
 *.swo
 
-# OS files
+# OS
 .DS_Store
 Thumbs.db
 
-# Project specific
-proxy.txt
-*.pdf
-documents/
-eng.traineddata
+# Monitoring
+monitoring/elasticsearch/data/
+monitoring/grafana/data/
+monitoring/prometheus/data/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/

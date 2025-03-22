@@ -1,0 +1,47 @@
+groups:
+  - name: scraper_alerts
+    rules:
+      - alert: HighErrorRate
+        expr: rate(scraper_errors_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: High error rate in scraper
+          description: "Error rate is {{ $value }} per second for the last 5 minutes"
+
+      - alert: NoDocumentsScraping
+        expr: rate(scraper_documents_total{status="success"}[15m]) == 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: No documents being scraped
+          description: "No successful document scrapes in the last 15 minutes"
+
+      - alert: SlowScraping
+        expr: histogram_quantile(0.95, rate(scraper_document_processing_duration_seconds_bucket[5m])) > 30
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Slow document processing
+          description: "95th percentile of document processing time is above 30 seconds"
+
+      - alert: HighMemoryUsage
+        expr: container_memory_usage_bytes{container_name="trump-scanner"} > 1.8e9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: High memory usage
+          description: "Container is using more than 1.8GB of memory"
+
+      - alert: ScraperDown
+        expr: up{job="scraper"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: Scraper is down
+          description: "Scraper instance has been down for more than 1 minute" 
