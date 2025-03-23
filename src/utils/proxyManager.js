@@ -1,12 +1,18 @@
-const fs = require('fs').promises;
-const path = require('path');
-const { logger } = require('./logger');
-const fetch = require('node-fetch');
+import fs from 'fs/promises';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { logger } from './logger.js';
+import fetch from 'node-fetch';
+import { HttpsProxyAgent } from 'https-proxy-agent';
 
-class ProxyManager {
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+export class ProxyManager {
     constructor() {
-        this.proxyFile = path.join(process.cwd(), 'proxy.txt');
+        this.proxyFile = path.join(process.cwd(), 'proxies.txt');
         this.proxies = [];
+        this.currentIndex = 0;
         this.failedProxies = new Set();
         this.lastCheck = 0;
         this.checkInterval = 30 * 60 * 1000; // 30 minutes
@@ -30,63 +36,47 @@ class ProxyManager {
     /**
      * Load proxies from file
      * @private
-     * @returns {Promise<void>}
+     * @returns {Promise<boolean>} True if proxies were loaded, false otherwise
      */
     async loadProxies() {
         try {
-            const content = await fs.readFile(this.proxyFile, 'utf8');
-            const lines = content.split('\n').filter(line => line.trim() && !line.startsWith('#'));
-            
-            this.proxies = lines.map(line => {
-                const [host, port, username, password] = line.trim().split(':');
-                return {
-                    host,
-                    port: parseInt(port),
-                    username,
-                    password,
-                    lastUsed: 0,
-                    failures: 0,
-                    lastCheck: 0
-                };
-            });
+            // Try to read proxies from file
+            const content = await fs.readFile(this.proxyFile, 'utf-8');
+            this.proxies = content
+                .split('\n')
+                .map(line => line.trim())
+                .filter(line => line && !line.startsWith('#'));
+
+            if (this.proxies.length === 0) {
+                logger.warn('No proxies found in proxies.txt');
+                return false;
+            }
 
             logger.info(`Loaded ${this.proxies.length} proxies from file`);
+            return true;
         } catch (error) {
-            logger.error('Error loading proxies:', error);
-            throw error;
+            if (error.code === 'ENOENT') {
+                logger.warn('No proxies.txt file found');
+            } else {
+                logger.error('Error loading proxies:', error);
+            }
+            return false;
         }
     }
 
     /**
      * Get a working proxy
-     * @returns {Promise<Object|null>} Proxy object or null if no working proxies
+     * @returns {Promise<string|null>} Proxy string or null if no working proxies
      */
     async getProxy() {
-        // Check if we need to validate proxies
-        if (Date.now() - this.lastCheck > this.checkInterval) {
-            await this.validateProxies();
-        }
-
-        // Filter out failed proxies and sort by last used time
-        const availableProxies = this.proxies
-            .filter(proxy => !this.failedProxies.has(`${proxy.host}:${proxy.port}`))
-            .sort((a, b) => a.lastUsed - b.lastUsed);
-
-        if (availableProxies.length === 0) {
-            logger.warn('No working proxies available');
+        if (this.proxies.length === 0) {
+            logger.warn('No proxies available');
             return null;
         }
 
-        // Get the least recently used proxy
-        const proxy = availableProxies[0];
-        proxy.lastUsed = Date.now();
-
-        return {
-            host: proxy.host,
-            port: proxy.port,
-            username: proxy.username,
-            password: proxy.password
-        };
+        const proxy = this.proxies[this.currentIndex];
+        this.currentIndex = (this.currentIndex + 1) % this.proxies.length;
+        return proxy;
     }
 
     /**
@@ -103,7 +93,7 @@ class ProxyManager {
 
         // Remove failed proxies
         this.proxies = this.proxies.filter(proxy => 
-            !this.failedProxies.has(`${proxy.host}:${proxy.port}`)
+            !this.failedProxies.has(proxy)
         );
 
         logger.info(`Proxy validation complete. ${this.proxies.length} working proxies remaining.`);
@@ -112,37 +102,26 @@ class ProxyManager {
     /**
      * Validate a single proxy
      * @private
-     * @param {Object} proxy Proxy object
+     * @param {string} proxy Proxy string
      * @returns {Promise<void>}
      */
     async validateProxy(proxy) {
-        const proxyUrl = proxy.username && proxy.password
-            ? `http://${proxy.username}:${proxy.password}@${proxy.host}:${proxy.port}`
-            : `http://${proxy.host}:${proxy.port}`;
-
         let retries = 0;
         while (retries < this.maxRetries) {
             try {
-                const controller = new AbortController();
-                const timeout = setTimeout(() => controller.abort(), this.timeout);
-
                 const response = await fetch('https://truthsocial.com', {
-                    agent: new (require('https-proxy-agent'))(proxyUrl),
-                    signal: controller.signal
+                    agent: new HttpsProxyAgent(proxy),
+                    timeout: this.timeout
                 });
 
-                clearTimeout(timeout);
-
                 if (response.ok) {
-                    proxy.lastCheck = Date.now();
-                    proxy.failures = 0;
                     return;
                 }
             } catch (error) {
                 retries++;
                 if (retries === this.maxRetries) {
-                    this.failedProxies.add(`${proxy.host}:${proxy.port}`);
-                    logger.warn(`Proxy ${proxy.host}:${proxy.port} failed validation:`, error.message);
+                    this.failedProxies.add(proxy);
+                    logger.warn(`Proxy ${proxy} failed validation:`, error.message);
                 }
                 await new Promise(resolve => setTimeout(resolve, 1000 * retries));
             }
@@ -151,17 +130,12 @@ class ProxyManager {
 
     /**
      * Mark a proxy as failed
-     * @param {string} host Proxy host
-     * @param {number} port Proxy port
+     * @param {string} proxy Proxy string
      */
-    markProxyAsFailed(host, port) {
-        const proxy = this.proxies.find(p => p.host === host && p.port === port);
-        if (proxy) {
-            proxy.failures++;
-            if (proxy.failures >= this.maxRetries) {
-                this.failedProxies.add(`${host}:${port}`);
-                logger.warn(`Proxy ${host}:${port} marked as failed after ${this.maxRetries} failures`);
-            }
+    markProxyAsFailed(proxy) {
+        if (this.failedProxies.has(proxy)) {
+            this.failedProxies.delete(proxy);
+            logger.warn(`Proxy ${proxy} marked as failed`);
         }
     }
 
@@ -177,6 +151,48 @@ class ProxyManager {
             lastCheck: this.lastCheck
         };
     }
-}
 
-module.exports = ProxyManager; 
+    getProxyString() {
+        if (this.proxies.length === 0) {
+            return null;
+        }
+
+        const proxy = this.proxies[this.currentIndex];
+        this.currentIndex = (this.currentIndex + 1) % this.proxies.length;
+        return proxy;
+    }
+
+    getProxyAuthString() {
+        const proxy = this.getProxyString();
+        if (!proxy) return null;
+        
+        // If proxy has username:password format
+        if (proxy.includes('@')) {
+            const [auth, host] = proxy.split('@');
+            const [username, password] = auth.split(':');
+            return { username, password };
+        }
+        
+        // If proxy is just host:port
+        return { username: '', password: '' };
+    }
+
+    getProxyList() {
+        return [...this.proxies];
+    }
+
+    addProxy(proxy) {
+        if (!this.proxies.includes(proxy)) {
+            this.proxies.push(proxy);
+        }
+    }
+
+    async saveProxies() {
+        try {
+            await fs.writeFile(this.proxyFile, this.proxies.join('\n'));
+            logger.info('Proxies saved to file');
+        } catch (error) {
+            logger.error('Error saving proxies:', error);
+        }
+    }
+} 

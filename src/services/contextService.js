@@ -33,7 +33,18 @@ class ContextService {
         article_date: '',
         article_author: '',
         section: '',
-        categories: []
+        categories: [],
+        type: this.determineContextType(quote, content),
+        location: this.extractLocation(content),
+        audience: this.extractAudience(content),
+        precedingContent: this.extractPrecedingContent(quote, content),
+        followingContent: this.extractFollowingContent(quote, content),
+        mediaContext: this.extractMediaContext(content),
+        politicalContext: this.extractPoliticalContext(content),
+        metadata: {
+          enrichedAt: new Date().toISOString(),
+          enrichmentVersion: '1.0'
+        }
       };
 
       // Find the quote in the content
@@ -62,6 +73,9 @@ class ContextService {
         context.section = this.extractSection($);
         context.categories = this.extractCategories($);
       }
+
+      // Archive the context
+      await archiveService.archiveQuote(quote, context);
 
       logger.info('Context enriched successfully', {
         source: quote.source_url,
@@ -176,29 +190,6 @@ class ContextService {
     return Array.from(categories);
   }
 
-  async enrichQuoteContext(quote, pageContent) {
-    const context = {
-      type: this.determineContextType(quote, pageContent),
-      timestamp: quote.timestamp || new Date().toISOString(),
-      location: this.extractLocation(pageContent),
-      audience: this.extractAudience(pageContent),
-      precedingContent: this.extractPrecedingContent(quote, pageContent),
-      followingContent: this.extractFollowingContent(quote, pageContent),
-      relatedQuotes: await this.findRelatedQuotes(quote),
-      mediaContext: this.extractMediaContext(pageContent),
-      politicalContext: this.extractPoliticalContext(pageContent),
-      metadata: {
-        enrichedAt: new Date().toISOString(),
-        enrichmentVersion: '1.0'
-      }
-    };
-
-    // Archive the enriched context
-    await archiveService.archiveHistoricalData(quote, context);
-
-    return context;
-  }
-
   determineContextType(quote, pageContent) {
     // Implement context type detection logic
     if (pageContent.includes('tweet')) return this.contextTypes.TWEET;
@@ -243,11 +234,6 @@ class ContextService {
       content: null,
       length: 0
     };
-  }
-
-  async findRelatedQuotes(quote) {
-    // Implement related quotes search logic
-    return [];
   }
 
   extractMediaContext(pageContent) {

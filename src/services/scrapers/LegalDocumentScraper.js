@@ -6,10 +6,10 @@ import { logger } from '../../utils/logger.js';
 import { getRandomUserAgent } from '../../utils/userAgents.js';
 import { Quote } from '../../models/Quote.js';
 import { createWorker } from 'tesseract.js';
-import pdf from 'pdf-parse';
+import { parsePDF } from '../../utils/pdfParser.js';
 import fs from 'fs/promises';
 import path from 'path';
-import sqlite3 from 'sqlite3';
+import { PrismaClient } from '@prisma/client';
 import fetch from 'node-fetch';
 import { ProxyManager } from '../../utils/proxyManager.js';
 
@@ -64,22 +64,13 @@ export class LegalDocumentScraper {
         this.pool = null;
         this.sourceId = null;
         this.proxyManager = new ProxyManager();
+        this.prisma = new PrismaClient();
     }
 
     async initialize() {
         try {
             logger.info('Initializing LegalDocumentScraper...');
             
-            // Load proxies
-            const proxiesLoaded = await this.proxyManager.loadProxies();
-            if (!proxiesLoaded) {
-                logger.warn('No proxies loaded, will run without proxy rotation');
-            }
-
-            // Get next proxy
-            const proxyString = this.proxyManager.getProxyString();
-            const proxyArgs = proxyString ? [`--proxy-server=${proxyString}`] : [];
-
             this.browser = await puppeteer.launch({
                 headless: 'new',
                 executablePath: executablePath(),
@@ -91,8 +82,7 @@ export class LegalDocumentScraper {
                     '--disable-gpu',
                     '--window-size=1920x1080',
                     '--disable-web-security',
-                    '--disable-features=IsolateOrigins,site-per-process',
-                    ...proxyArgs
+                    '--disable-features=IsolateOrigins,site-per-process'
                 ]
             });
             this.page = await this.browser.newPage();
@@ -123,94 +113,18 @@ export class LegalDocumentScraper {
             // Create documents directory structure
             await this.createDirectoryStructure();
 
-            // Initialize SQLite database
-            await new Promise((resolve, reject) => {
-                this.db = new sqlite3.Database('trump_scanner.db', async (err) => {
-                    if (err) {
-                        reject(err);
-                        return;
-                    }
-
-                    // Create tables if they don't exist
-                    this.db.run(`
-                        CREATE TABLE IF NOT EXISTS sources (
-                            id INTEGER PRIMARY KEY AUTOINCREMENT,
-                            name TEXT NOT NULL,
-                            url TEXT UNIQUE NOT NULL,
-                            category_id INTEGER,
-                            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-                        )
-                    `, (err) => {
-                        if (err) {
-                            reject(err);
-                            return;
-                        }
-
-                        this.db.run(`
-                            CREATE TABLE IF NOT EXISTS legal_documents (
-                                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                                source_id INTEGER,
-                                url TEXT UNIQUE,
-                                title TEXT,
-                                case_number TEXT,
-                                court TEXT,
-                                filing_date TEXT,
-                                content TEXT,
-                                metadata TEXT,
-                                pdf_urls TEXT,
-                                downloaded_pdfs TEXT,
-                                pdf_content TEXT,
-                                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                                FOREIGN KEY (source_id) REFERENCES sources(id)
-                            )
-                        `, async (err) => {
-                            if (err) {
-                                reject(err);
-                                return;
-                            }
-
-                            try {
-                                // Get or create source record
-                                const source = await new Promise((resolve, reject) => {
-                                    this.db.get(
-                                        'SELECT id FROM sources WHERE url = ?',
-                                        [this.config.baseUrl],
-                                        async (err, row) => {
-                                            if (err) {
-                                                reject(err);
-                                                return;
-                                            }
-
-                                            if (row) {
-                                                resolve(row);
-                                            } else {
-                                                this.db.run(
-                                                    'INSERT INTO sources (name, url, category_id) VALUES (?, ?, ?)',
-                                                    [this.config.name, this.config.baseUrl, this.config.categoryId],
-                                                    function(err) {
-                                                        if (err) {
-                                                            reject(err);
-                                                            return;
-                                                        }
-                                                        resolve({ id: this.lastID });
-                                                    }
-                                                );
-                                            }
-                                        }
-                                    );
-                                });
-
-                                this.sourceId = source.id;
-                                resolve();
-                            } catch (error) {
-                                reject(error);
-                            }
-                        });
-                    });
-                });
+            // Get or create source record
+            const source = await this.prisma.source.upsert({
+                where: { url: this.config.baseUrl },
+                update: {},
+                create: {
+                    name: this.config.name,
+                    url: this.config.baseUrl,
+                    categoryId: this.config.categoryId
+                }
             });
+
+            this.sourceId = source.id;
 
             logger.info('LegalDocumentScraper initialized successfully');
             return true;
@@ -244,103 +158,24 @@ export class LegalDocumentScraper {
             const page = await this.browser.newPage();
             
             try {
-                // Try using ScrapeOps API first
-                try {
-                    const apiUrl = `https://proxy.scrapeops.io/v1/?api_key=${process.env.SCRAPEOPS_API_KEY || 'your_scrapeops_api_key'}&url=${encodeURIComponent(url)}`;
-                    const response = await fetch(apiUrl);
-                    const html = await response.text();
-
-                    if (!html.includes('JavaScript is disabled') && !html.includes('Checking if the site connection is secure')) {
-                        await page.setContent(html);
-
-                        // Extract data based on the URL
-                        let documentData;
-                        if (url.includes('courtlistener.com')) {
-                            documentData = await this.extractCourtListenerData(page);
-                        } else if (url.includes('documentcloud.org')) {
-                            documentData = await this.extractDocumentCloudData(page);
-                        } else {
-                            throw new Error('Unsupported document source');
-                        }
-
-                        return documentData;
-                    }
-                } catch (error) {
-                    logger.error('Error using ScrapeOps API:', error);
+                // Use ScrapeOps API to get the content
+                const apiUrl = `https://proxy.scrapeops.io/v1/?api_key=1e3ddfbb-c565-4464-b425-1d59057c7ad0&url=${encodeURIComponent(url)}`;
+                const response = await fetch(apiUrl);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
                 }
 
-                // If ScrapeOps fails, try direct access with retry logic
-                let retryCount = 0;
-                const maxRetries = 3;
-                let success = false;
+                const html = await response.text();
+                logger.info('Received HTML content from ScrapeOps');
 
-                while (!success && retryCount < maxRetries) {
-                    try {
-                        // Get next proxy for this attempt
-                        const proxyString = this.proxyManager.getProxyString();
-                        if (proxyString) {
-                            logger.info(`Using proxy: ${proxyString}`);
-                            await page.authenticate({
-                                username: this.proxyManager.getProxyAuthString(),
-                                password: '' // Add password if needed
-                            });
-                        }
+                // Set the content in the page
+                await page.setContent(html, {
+                    waitUntil: 'networkidle0',
+                    timeout: 60000
+                });
 
-                        await page.goto(url, {
-                            waitUntil: 'networkidle0',
-                            timeout: 60000
-                        });
-
-                        // Check for Cloudflare protection
-                        const cloudflareContent = await page.content();
-                        if (cloudflareContent.includes('Just a moment') || 
-                            cloudflareContent.includes('Checking if the site connection is secure') ||
-                            cloudflareContent.includes('JavaScript is disabled')) {
-                            logger.info('Detected Cloudflare protection, waiting for challenge to complete...');
-                            
-                            // Wait for Cloudflare to finish
-                            await page.waitForFunction(() => {
-                                return !document.querySelector('#challenge-running') &&
-                                       !document.querySelector('#challenge-stage') &&
-                                       !document.querySelector('#challenge-form');
-                            }, { timeout: 30000 });
-
-                            // Additional wait to ensure page is fully loaded
-                            await new Promise(resolve => setTimeout(resolve, 5000));
-                        }
-
-                        // Wait for main content to load
-                        await page.waitForSelector('body', { timeout: 10000 });
-
-                        // Check if we got the actual content
-                        const pageContent = await page.content();
-                        if (!pageContent.includes('JavaScript is disabled') && 
-                            !pageContent.includes('Checking if the site connection is secure')) {
-                            success = true;
-                        } else {
-                            logger.info('Still getting Cloudflare page, retrying with next proxy...');
-                            await new Promise(resolve => setTimeout(resolve, 5000));
-                            retryCount++;
-                        }
-                    } catch (error) {
-                        logger.error(`Navigation attempt ${retryCount + 1} failed:`, error);
-                        if (retryCount < maxRetries - 1) {
-                            const waitTime = Math.pow(2, retryCount) * 1000;
-                            logger.info(`Waiting ${waitTime}ms before retry...`);
-                            await new Promise(resolve => setTimeout(resolve, waitTime));
-                        }
-                        retryCount++;
-                    }
-                }
-
-                if (!success) {
-                    throw new Error(`Failed to load page after ${maxRetries} attempts`);
-                }
-
-                // Take a screenshot for debugging
-                await page.screenshot({ path: 'debug/screenshots/debug-screenshot.png' });
-
-                // Extract document data based on the URL
+                // Extract data based on the URL
                 let documentData;
                 if (url.includes('courtlistener.com')) {
                     documentData = await this.extractCourtListenerData(page);
@@ -350,7 +185,10 @@ export class LegalDocumentScraper {
                     throw new Error('Unsupported document source');
                 }
 
-                logger.info('Document data extracted successfully');
+                // Add URL to document data
+                documentData.url = url;
+                documentData.metadata.url = url;
+
                 return documentData;
 
             } finally {
@@ -368,30 +206,20 @@ export class LegalDocumentScraper {
         try {
             logger.info('Extracting data from CourtListener...');
 
+            // Wait for the main content to load with a longer timeout
+            await page.waitForSelector('body', { timeout: 60000 });
+            logger.info('Body loaded');
+
+            // Take a screenshot for debugging
+            await page.screenshot({ path: 'debug/screenshots/debug-page.png' });
+
             // Log the page content for debugging
             const pageContent = await page.content();
             logger.info('Page content length:', pageContent.length);
-            
-            // Wait for any content to load
-            await page.waitForSelector('body', { timeout: 30000 });
-            logger.info('Body loaded');
 
-            // Log available elements
-            const elements = await page.evaluate(() => {
-                const all = document.querySelectorAll('*');
-                return Array.from(all, el => ({
-                    tag: el.tagName.toLowerCase(),
-                    id: el.id,
-                    classes: Array.from(el.classList)
-                }));
-            });
-            logger.info('Available elements:', JSON.stringify(elements, null, 2));
-
-            // Try different selectors for the title
+            // Extract title
             const title = await page.evaluate(() => {
-                // Try multiple possible selectors
                 const selectors = [
-                    '.docket-header h2',
                     'h1',
                     'h2',
                     '.docket-title',
@@ -409,7 +237,7 @@ export class LegalDocumentScraper {
             });
             logger.info('Title:', title);
 
-            // Try different selectors for case number
+            // Extract case number
             const caseNumber = await page.evaluate(() => {
                 const selectors = [
                     '.docket-number',
@@ -428,7 +256,7 @@ export class LegalDocumentScraper {
             });
             logger.info('Case Number:', caseNumber);
 
-            // Try different selectors for court
+            // Extract court
             const court = await page.evaluate(() => {
                 const selectors = [
                     '.court-name',
@@ -447,7 +275,7 @@ export class LegalDocumentScraper {
             });
             logger.info('Court:', court);
 
-            // Try different selectors for filing date
+            // Extract filing date
             const filingDate = await page.evaluate(() => {
                 const selectors = [
                     '.filing-date',
@@ -466,7 +294,7 @@ export class LegalDocumentScraper {
             });
             logger.info('Filing Date:', filingDate);
 
-            // Try different selectors for PDF links
+            // Extract PDF URLs
             const pdfUrls = await page.evaluate(() => {
                 const selectors = [
                     'a[href*="/recap/"]',
@@ -488,7 +316,7 @@ export class LegalDocumentScraper {
             });
             logger.info('PDF URLs:', pdfUrls);
 
-            // Try different selectors for main content
+            // Extract main content
             const content = await page.evaluate(() => {
                 const selectors = [
                     '.docket-entries',
@@ -503,12 +331,9 @@ export class LegalDocumentScraper {
                         return element.textContent.trim();
                     }
                 }
-                return null;
+                return document.body.textContent.trim();
             });
             logger.info('Content length:', content?.length || 0);
-
-            // Take a screenshot for debugging
-            await page.screenshot({ path: 'debug/screenshots/debug-page.png' });
 
             // Extract additional metadata
             const metadata = {
@@ -542,8 +367,8 @@ export class LegalDocumentScraper {
         try {
             logger.info('Extracting data from DocumentCloud...');
 
-            // Wait for the document to load
-            await page.waitForSelector('.DC-page', { timeout: 10000 });
+            // Wait for any content to load with a longer timeout
+            await page.waitForSelector('body', { timeout: 30000 });
 
             // Extract metadata from meta tags
             const metadata = await page.evaluate(() => {
@@ -560,15 +385,45 @@ export class LegalDocumentScraper {
             });
             logger.info('Metadata:', metadata);
 
-            // Extract PDF URL
-            const pdfUrl = await page.$eval('link[type="application/pdf"]', el => el.href)
-                .catch(() => null);
+            // Try different selectors for PDF URL
+            const pdfUrl = await page.evaluate(() => {
+                const selectors = [
+                    'link[type="application/pdf"]',
+                    'a[href$=".pdf"]',
+                    '.document-pdf-link',
+                    '.pdf-download'
+                ];
+                
+                for (const selector of selectors) {
+                    const element = document.querySelector(selector);
+                    if (element) {
+                        return element.href;
+                    }
+                }
+                return null;
+            });
             const pdfUrls = pdfUrl ? [pdfUrl] : [];
             logger.info('PDF URLs:', pdfUrls);
 
-            // Extract content
-            const content = await page.$eval('.DC-page', el => el.textContent.trim())
-                .catch(() => null);
+            // Try different selectors for content
+            const content = await page.evaluate(() => {
+                const selectors = [
+                    '.DC-page',
+                    '.document-content',
+                    '.document-text',
+                    '#document-content',
+                    'article',
+                    'main'
+                ];
+                
+                for (const selector of selectors) {
+                    const element = document.querySelector(selector);
+                    if (element) {
+                        return element.textContent.trim();
+                    }
+                }
+                return document.body.textContent.trim();
+            });
             logger.info('Content length:', content?.length || 0);
 
             return {
@@ -589,67 +444,112 @@ export class LegalDocumentScraper {
         }
     }
 
-    async downloadPDFs(urls) {
-        const downloadedFiles = [];
-        for (const url of urls) {
-            try {
-                const response = await fetch(url);
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    async downloadPDFs(documentData) {
+        try {
+            logger.info('Downloading PDFs...');
+            const pdfs = [];
 
-                const buffer = await response.arrayBuffer();
-                if (buffer.byteLength > this.config.legal_documents.maxPDFSize) {
-                    logger.warn(`Skipping large PDF: ${url}`);
-                    continue;
+            for (const pdfUrl of documentData.pdfUrls) {
+                try {
+                    // Skip non-PDF URLs
+                    if (!pdfUrl.toLowerCase().endsWith('.pdf')) {
+                        logger.info(`Skipping non-PDF URL: ${pdfUrl}`);
+                        continue;
+                    }
+
+                    // Use ScrapeOps API for PDF downloads
+                    const apiUrl = `https://proxy.scrapeops.io/v1/?api_key=1e3ddfbb-c565-4464-b425-1d59057c7ad0&url=${encodeURIComponent(pdfUrl)}`;
+                    const response = await fetch(apiUrl);
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+
+                    const buffer = await response.arrayBuffer();
+                    const timestamp = Date.now();
+                    const filename = `${timestamp}_${pdfUrl.split('/').pop()}`;
+                    const filepath = path.join(this.config.directories.pdfs, filename);
+
+                    // Save the PDF
+                    await fs.writeFile(filepath, Buffer.from(buffer));
+                    logger.info(`Downloaded PDF: ${filename}`);
+
+                    // Parse the PDF
+                    const pdfData = await this.parsePDF(filepath);
+                    pdfs.push({
+                        filename,
+                        filepath,
+                        ...pdfData
+                    });
+
+                } catch (error) {
+                    logger.error(`Error downloading PDF from ${pdfUrl}:`, error);
                 }
-
-                const filename = `${Date.now()}_${path.basename(url)}`;
-                const filepath = path.join(process.cwd(), 'documents/legal/pdfs', filename);
-                
-                await fs.writeFile(filepath, Buffer.from(buffer));
-                downloadedFiles.push(filepath);
-                
-                logger.info(`Downloaded PDF: ${filename}`);
-                
-                // Respect rate limits
-                await delay(this.config.requestDelay.min);
-                
-            } catch (error) {
-                logger.error(`Error downloading PDF from ${url}:`, error);
             }
+
+            return pdfs;
+        } catch (error) {
+            logger.error('Error downloading PDFs:', error);
+            throw error;
         }
-        return downloadedFiles;
     }
 
     async extractPDFContent(filepaths) {
         const contents = [];
         for (const filepath of filepaths) {
             try {
+                // Check if file exists
+                try {
+                    await fs.access(filepath);
+                } catch (error) {
+                    logger.error(`PDF file not found: ${filepath}`);
+                    continue;
+                }
+
                 // Try PDF text extraction first
                 const dataBuffer = await fs.readFile(filepath);
-                const pdfData = await pdf(dataBuffer);
-                let text = pdfData.text;
+                let text = '';
+                let pageCount = 0;
+                let metadata = {};
 
-                // If text extraction yields little content and OCR is enabled, try OCR
+                try {
+                    const pdfData = await parsePDF(dataBuffer);
+                    text = pdfData.text;
+                    pageCount = pdfData.numpages;
+                    metadata = pdfData.metadata;
+                } catch (error) {
+                    logger.error(`Error parsing PDF ${filepath}:`, error);
+                    // Continue with empty text, we'll try OCR if enabled
+                }
+
+                // If text extraction yielded little content and OCR is enabled, try OCR
                 if (this.config.legal_documents.ocrEnabled && 
-                    text.length < 1000 && this.ocrWorker) {
-                    logger.info(`Attempting OCR on: ${filepath}`);
-                    const { data: { text: ocrText } } = await this.ocrWorker.recognize(filepath);
-                    
-                    // Use OCR text if it yielded more content
-                    if (ocrText.length > text.length) {
-                        text = ocrText;
+                    text.length < 1000) {
+                    try {
+                        if (!this.ocrWorker) {
+                            this.ocrWorker = await createWorker(this.config.legal_documents.ocrLanguage);
+                        }
+                        logger.info(`Attempting OCR on: ${filepath}`);
+                        const { data: { text: ocrText } } = await this.ocrWorker.recognize(filepath);
+                        
+                        // Use OCR text if it yielded more content
+                        if (ocrText.length > text.length) {
+                            text = ocrText;
+                        }
+                    } catch (error) {
+                        logger.error(`Error performing OCR on ${filepath}:`, error);
                     }
                 }
 
                 contents.push({
                     filepath,
                     text,
-                    pageCount: pdfData.numpages,
-                    metadata: pdfData.metadata
+                    pageCount,
+                    metadata
                 });
 
             } catch (error) {
-                logger.error(`Error extracting content from PDF ${filepath}:`, error);
+                logger.error(`Error processing PDF ${filepath}:`, error);
             }
         }
         return contents;
@@ -657,45 +557,43 @@ export class LegalDocumentScraper {
 
     async saveDocument(documentData) {
         try {
-            return new Promise((resolve, reject) => {
-                // Prepare JSON fields
-                const metadata = documentData.metadata ? JSON.stringify(documentData.metadata) : '{}';
-                const pdfUrls = documentData.pdfUrls ? JSON.stringify(documentData.pdfUrls) : '[]';
-                const downloadedPdfs = documentData.downloadedPdfs ? JSON.stringify(documentData.downloadedPdfs) : '[]';
-                const pdfContent = documentData.pdfContent ? JSON.stringify(documentData.pdfContent) : '[]';
-
-                // Insert or update the legal document
-                this.db.run(`
-                    INSERT OR REPLACE INTO legal_documents (
-                        source_id, url, title, case_number, court, 
-                        filing_date, content, metadata, pdf_urls,
-                        downloaded_pdfs, pdf_content, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
-                    [
-                        this.sourceId || null,
-                        documentData.url || null,
-                        documentData.title || null,
-                        documentData.caseNumber || null,
-                        documentData.court || null,
-                        documentData.filingDate || null,
-                        documentData.content || null,
-                        metadata,
-                        pdfUrls,
-                        downloadedPdfs,
-                        pdfContent
-                    ],
-                    function(err) {
-                        if (err) {
-                            reject(err);
-                            return;
-                        }
-                        logger.info(`Saved legal document ${this.lastID} to database`);
-                        resolve(this.lastID);
-                    }
-                );
+            const savedDoc = await this.prisma.document.upsert({
+                where: { url: documentData.url || documentData.metadata?.url || '' },
+                update: {
+                    content: documentData.content || '',
+                    type: 'legal',
+                    metadata: JSON.stringify({
+                        title: documentData.title,
+                        caseNumber: documentData.case_number,
+                        court: documentData.court,
+                        filingDate: documentData.filing_date,
+                        pdfUrls: documentData.pdfUrls,
+                        downloadedPdfs: documentData.downloadedPdfs,
+                        pdfContent: documentData.pdfContent,
+                        url: documentData.url || documentData.metadata?.url
+                    })
+                },
+                create: {
+                    url: documentData.url || documentData.metadata?.url || '',
+                    content: documentData.content || '',
+                    type: 'legal',
+                    metadata: JSON.stringify({
+                        title: documentData.title,
+                        caseNumber: documentData.case_number,
+                        court: documentData.court,
+                        filingDate: documentData.filing_date,
+                        pdfUrls: documentData.pdfUrls,
+                        downloadedPdfs: documentData.downloadedPdfs,
+                        pdfContent: documentData.pdfContent,
+                        url: documentData.url || documentData.metadata?.url
+                    })
+                }
             });
+
+            logger.info(`Saved legal document ${savedDoc.id} to database`);
+            return savedDoc;
         } catch (error) {
-            logger.error('Error saving legal document to database:', error);
+            logger.error('Error saving legal document:', error);
             throw error;
         }
     }
@@ -706,17 +604,6 @@ export class LegalDocumentScraper {
         }
         if (this.browser) {
             await this.browser.close();
-        }
-        if (this.db) {
-            await new Promise((resolve, reject) => {
-                this.db.close((err) => {
-                    if (err) {
-                        reject(err);
-                    } else {
-                        resolve();
-                    }
-                });
-            });
         }
     }
 } 

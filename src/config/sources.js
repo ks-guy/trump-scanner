@@ -29,7 +29,7 @@ const sources = {
         'https://www.c-span.org/person/?donaldtrump'
     ],
 
-    // Legal proceedings and court transcripts
+    // Legal proceedings and court transcripts (prioritized)
     legal: [
         // Criminal Cases
         'https://www.courtlistener.com/docket/63629075/united-states-v-trump/',  // DC Criminal case
@@ -51,11 +51,36 @@ const sources = {
         'https://www.documentcloud.org/documents/24420166-trump-ny-appeal',       // NY Appeal
         'https://www.documentcloud.org/documents/24383794-trump-immunity-ruling', // Immunity ruling
         'https://www.documentcloud.org/documents/24383795-trump-ga-indictment',   // GA Indictment
-        'https://www.documentcloud.org/documents/24383796-trump-dc-indictment'    // DC Indictment
+        'https://www.documentcloud.org/documents/24383796-trump-dc-indictment',   // DC Indictment
+        
+        // Additional Legal Sources
+        'https://www.justice.gov/archives/doj/trump-related-cases',              // DOJ Trump Cases
+        'https://www.supremecourt.gov/search.aspx?filename=/docket/docketfiles/html/public/23-624.html', // SCOTUS Trump Case
+        'https://www.nycourts.gov/courts/1jd/supctmanh/cases/trump.html',        // NY Courts Trump Cases
+        'https://www.gasupreme.us/cases/trump/',                                 // GA Supreme Court Trump Cases
+        'https://www.dcd.uscourts.gov/criminal-cases/trump',                     // DC District Court Trump Cases
+        'https://www.flmd.uscourts.gov/civil-cases/trump',                       // FL District Court Trump Cases
+        'https://www.pacourts.us/courts/supreme-court/cases/trump',              // PA Supreme Court Trump Cases
+        'https://www.maine.gov/courts/supreme/opinions/trump',                   // ME Supreme Court Trump Cases
+        'https://www.courts.illinois.gov/SupremeCourt/Opinions/trump.html'       // IL Supreme Court Trump Cases
     ],
 
-    // Official documents signed by Trump
+    // Official documents signed by Trump (prioritized)
     official_documents: {
+        // Legal and Court Documents (prioritized)
+        legal_documents: [
+            'https://www.courtlistener.com/docket/?q=&type=r&order_by=score+desc&case_name=trump',
+            'https://www.documentcloud.org/app/search?q=project%3Atrump-signed-documents',
+            'https://www.justice.gov/archives/doj/trump-related-cases',
+            'https://www.supremecourt.gov/search.aspx?filename=/docket/docketfiles/html/public/23-624.html',
+            'https://www.nycourts.gov/courts/1jd/supctmanh/cases/trump.html',
+            'https://www.gasupreme.us/cases/trump/',
+            'https://www.dcd.uscourts.gov/criminal-cases/trump',
+            'https://www.flmd.uscourts.gov/civil-cases/trump',
+            'https://www.pacourts.us/courts/supreme-court/cases/trump',
+            'https://www.maine.gov/courts/supreme/opinions/trump',
+            'https://www.courts.illinois.gov/SupremeCourt/Opinions/trump.html'
+        ],
         // Executive Orders
         executive_orders: [
             'https://www.federalregister.gov/presidential-documents/executive-orders/donald-trump/2017',
@@ -116,31 +141,26 @@ const sources = {
             'https://www.govinfo.gov/app/collection/PPP/president-45',
             'https://www.govinfo.gov/app/collection/DCPD/president-45',
             'https://www.congress.gov/presidential-actions/donald-trump'
-        ],
-        // Legal and Court Documents
-        legal_documents: [
-            'https://www.courtlistener.com/docket/?q=&type=r&order_by=score+desc&case_name=trump',
-            'https://www.documentcloud.org/app/search?q=project%3Atrump-signed-documents'
         ]
     }
 };
 
 // Configuration for scraping behavior
 const config = {
-    maxConcurrent: 3,  // Reduced for more reliable scraping
+    maxConcurrent: 2,  // Reduced for more reliable scraping of legal documents
     requestDelay: {
-        min: 5000,     // Increased minimum delay (5 seconds)
-        max: 10000     // Increased maximum delay (10 seconds)
+        min: 10000,    // Increased minimum delay (10 seconds)
+        max: 20000     // Increased maximum delay (20 seconds)
     },
-    maxRequestsPerDomain: 50,   // Reduced for better rate limiting
+    maxRequestsPerDomain: 25,   // Reduced for better rate limiting
     userAgentRotation: true,    
     proxyRotation: true,        
-    retryAttempts: 5,          // Increased retry attempts
+    retryAttempts: 5,          
     followRedirects: true,      
     respectRobotsTxt: true,     
-    maxQuotesPerPage: 100,      // Increased for legal documents
-    minQuoteLength: 10,         
-    maxQuoteLength: 5000,       // Increased for legal documents
+    maxQuotesPerPage: 50,       // Reduced for legal documents
+    minQuoteLength: 50,         // Increased for legal documents
+    maxQuoteLength: 10000,      // Increased for legal documents
     
     // Additional settings for official documents
     official_documents: {
@@ -153,6 +173,12 @@ const config = {
         includeAttachments: true,
         validateDocuments: true,
         documentTypes: [
+            'indictments',       // Prioritized document types
+            'appeals',          
+            'rulings',          
+            'orders',           
+            'transcripts',
+            'legal_filings',
             'executive_orders',
             'memoranda',
             'proclamations',
@@ -163,30 +189,32 @@ const config = {
             'administrative_orders',
             'signing_statements',
             'letters',
-            'messages',
-            'legal_filings',
-            'indictments',       // Added document type
-            'appeals',           // Added document type
-            'rulings',          // Added document type
-            'orders',           // Added document type
-            'transcripts'       // Added document type
+            'messages'
         ],
-        // Added specific settings for legal documents
+        // Enhanced settings for legal documents
         legal_documents: {
-            extractCitations: true,      // Extract legal citations
-            extractParties: true,        // Extract party names
-            extractDates: true,          // Extract important dates
-            extractJudges: true,         // Extract judge information
-            extractCaseNumbers: true,    // Extract case numbers
-            extractVenues: true,         // Extract court venues
-            extractCharges: true,        // Extract criminal charges
-            extractStatutes: true,       // Extract referenced statutes
-            extractExhibits: true,       // Extract exhibit information
-            extractWitnesses: true,      // Extract witness information
+            extractCitations: true,      
+            extractParties: true,        
+            extractDates: true,          
+            extractJudges: true,         
+            extractCaseNumbers: true,    
+            extractVenues: true,         
+            extractCharges: true,        
+            extractStatutes: true,       
+            extractExhibits: true,       
+            extractWitnesses: true,      
             maxPDFSize: 100 * 1024 * 1024, // 100MB max PDF size
-            ocrEnabled: true,            // Enable OCR for scanned documents
-            ocrLanguage: 'eng',          // OCR language
-            pdfTextExtraction: 'hybrid'  // Use both PDF text and OCR
+            ocrEnabled: true,            
+            ocrLanguage: 'eng',          
+            pdfTextExtraction: 'hybrid',  // Use both PDF text and OCR
+            prioritizeRecent: true,      // Prioritize recent documents
+            includeCourtFilings: true,   // Include court filings
+            includeExhibits: true,       // Include exhibits
+            includeTranscripts: true,    // Include transcripts
+            includeOrders: true,         // Include court orders
+            includeRulings: true,        // Include court rulings
+            includeAppeals: true,        // Include appeals
+            includeIndictments: true     // Include indictments
         }
     }
 };

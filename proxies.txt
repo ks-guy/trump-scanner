@@ -1,0 +1,8 @@
+# Sample proxy list
+# Format: host:port:username:password
+# One proxy per line
+# Lines starting with # are comments
+
+# Example proxies (replace with your actual proxies)
+127.0.0.1:8080
+localhost:8080 
