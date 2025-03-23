@@ -6,41 +6,43 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql"
-  url      = env("DATABASE_URL")
-}
-
-model Document {
-  id          Int      @id @default(autoincrement())
-  url         String   @unique
-  title       String
-  text        String   @db.Text
-  type        String
-  pdfPath     String?
-  scrapedAt   DateTime
-  metadata    Json?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  provider = "sqlite"
+  url      = "file:./dev.db"
 }
 
 model Quote {
-  id          Int      @id @default(autoincrement())
-  text        String   @db.Text
-  speaker     String
-  source      String
-  date        DateTime
-  context     String?  @db.Text
-  metadata    Json?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        Int      @id @default(autoincrement())
+  text      String
+  speaker   String
+  source    String
+  date      DateTime @default(now())
+  context   String?
+  metadata  String?  // Stored as JSON string
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([date])
+  @@index([source])
+  @@index([speaker])
+}
+
+model Document {
+  id        Int      @id @default(autoincrement())
+  url       String   @unique
+  content   String
+  type      String
+  metadata  String?  // Stored as JSON string
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Analysis {
-  id          Int      @id @default(autoincrement())
-  documentId  Int
-  type        String
-  result      Json
-  metadata    Json?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        Int      @id @default(autoincrement())
+  quoteId   Int
+  type      String
+  result    String   // Stored as JSON string
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([quoteId])
 } 

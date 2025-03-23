@@ -1,9 +1,10 @@
 import { PrismaClient } from '@prisma/client';
-import { logger } from '../utils/logger.js';
+import { createLogger } from '../utils/logger.js';
 
 const prisma = new PrismaClient();
+const logger = createLogger('Quote');
 
-class Quote {
+export class Quote {
     static async initialize() {
         try {
             // Test the connection
@@ -17,18 +18,17 @@ class Quote {
 
     static async insert(quote) {
         try {
-            const result = await prisma.post.create({
+            const result = await prisma.quote.create({
                 data: {
-                    content: quote.quote_text,
-                    likes: 0,
-                    reposts: 0,
-                    replies: 0,
-                    isReply: false,
-                    metadata: {
-                        source_url: quote.source_url,
-                        context: quote.context,
-                        pdf_path: quote.pdf_path
-                    }
+                    text: quote.quote_text,
+                    speaker: 'Donald Trump',
+                    source: quote.source_url,
+                    date: new Date(),
+                    context: JSON.stringify(quote.context),
+                    metadata: JSON.stringify({
+                        fact_check: quote.fact_check,
+                        verification: quote.verification
+                    })
                 }
             });
 
@@ -44,18 +44,17 @@ class Quote {
 
         try {
             const result = await prisma.$transaction(
-                quotes.map(q => prisma.post.create({
+                quotes.map(q => prisma.quote.create({
                     data: {
-                        content: q.quote_text,
-                        likes: 0,
-                        reposts: 0,
-                        replies: 0,
-                        isReply: false,
-                        metadata: {
-                            source_url: q.source_url,
-                            context: q.context,
-                            pdf_path: q.pdf_path
-                        }
+                        text: q.quote_text,
+                        speaker: 'Donald Trump',
+                        source: q.source_url,
+                        date: new Date(),
+                        context: JSON.stringify(q.context),
+                        metadata: JSON.stringify({
+                            fact_check: q.fact_check,
+                            verification: q.verification
+                        })
                     }
                 }))
             );
@@ -69,14 +68,17 @@ class Quote {
 
     static async findBySourceUrl(url) {
         try {
-            return await prisma.post.findMany({
+            const quotes = await prisma.quote.findMany({
                 where: {
-                    metadata: {
-                        path: ['source_url'],
-                        equals: url
-                    }
+                    source: url
                 }
             });
+            
+            return quotes.map(quote => ({
+                ...quote,
+                context: JSON.parse(quote.context || '{}'),
+                metadata: JSON.parse(quote.metadata || '{}')
+            }));
         } catch (error) {
             logger.error('Failed to find quotes by source URL:', error);
             throw error;
@@ -88,18 +90,24 @@ class Quote {
             const limit = options.limit || 10;
             const offset = options.offset || 0;
             
-            return await prisma.post.findMany({
+            const quotes = await prisma.quote.findMany({
                 where: {
-                    content: {
+                    text: {
                         contains: query
                     }
                 },
                 take: limit,
                 skip: offset,
                 orderBy: {
-                    createdAt: 'desc'
+                    date: 'desc'
                 }
             });
+
+            return quotes.map(quote => ({
+                ...quote,
+                context: JSON.parse(quote.context || '{}'),
+                metadata: JSON.parse(quote.metadata || '{}')
+            }));
         } catch (error) {
             logger.error('Failed to search quotes:', error);
             throw error;
@@ -108,33 +116,29 @@ class Quote {
 
     static async getStats() {
         try {
-            const totalQuotes = await prisma.post.count();
-            const latestQuote = await prisma.post.findFirst({
-                orderBy: { createdAt: 'desc' }
+            const totalQuotes = await prisma.quote.count();
+            const latestQuote = await prisma.quote.findFirst({
+                orderBy: { date: 'desc' }
             });
-            const oldestQuote = await prisma.post.findFirst({
-                orderBy: { createdAt: 'asc' }
+            const oldestQuote = await prisma.quote.findFirst({
+                orderBy: { date: 'asc' }
             });
 
             return {
                 totalQuotes,
-                latestQuote,
-                oldestQuote
+                latestQuote: latestQuote ? {
+                    ...latestQuote,
+                    context: JSON.parse(latestQuote.context || '{}'),
+                    metadata: JSON.parse(latestQuote.metadata || '{}')
+                } : null,
+                oldestQuote: oldestQuote ? {
+                    ...oldestQuote,
+                    context: JSON.parse(oldestQuote.context || '{}'),
+                    metadata: JSON.parse(oldestQuote.metadata || '{}')
+                } : null
             };
         } catch (error) {
             logger.error('Failed to get quote statistics:', error);
-            throw error;
-        }
-    }
-
-    static async getPDFPath(quoteId) {
-        try {
-            const post = await prisma.post.findUnique({
-                where: { id: quoteId }
-            });
-            return post?.metadata?.pdf_path;
-        } catch (error) {
-            logger.error('Failed to get PDF path:', error);
             throw error;
         }
     }
@@ -148,6 +152,4 @@ class Quote {
             throw error;
         }
     }
-}
-
-export { Quote }; 
+} 

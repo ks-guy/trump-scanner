@@ -13,12 +13,14 @@ export const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
  * Generate a random delay between min and max milliseconds
  * @param {number} min - Minimum delay in milliseconds
  * @param {number} max - Maximum delay in milliseconds
- * @returns {Promise} Promise that resolves after the random delay
+ * @returns {Promise} - Resolves after the random delay
  */
-export const randomDelay = (min, max) => {
-    const delayTime = Math.floor(Math.random() * (max - min + 1) + min);
-    return delay(delayTime);
-};
+export function randomDelay(min, max) {
+    return () => new Promise(resolve => {
+        const delay = Math.floor(Math.random() * (max - min + 1)) + min;
+        setTimeout(resolve, delay);
+    });
+}
 
 /**
  * Rate limiter class to manage request rates

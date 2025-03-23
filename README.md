@@ -1,213 +1,144 @@
-# Trump Scanner
+# Trump Scanner - Document Processing Service
 
-A document scraping and analysis system with comprehensive monitoring and logging.
+This service provides advanced document processing capabilities for the Trump Scanner project, including OCR, signature verification, and document authenticity checks.
 
-## System Requirements
+## Features
 
-* Docker Engine 20.10+
-* Docker Compose 2.0+
-* 4GB RAM minimum (8GB recommended)
-* 20GB free disk space
-* Linux/Unix-based system (Windows requires WSL2)
+### Document Processing
+- Support for multiple document types (PDF, Word, Images)
+- OCR processing using Tesseract.js
+- Document structure analysis
+- Table and image extraction
+- Metadata extraction
 
-## Quick Start
+### Image Processing
+- Image quality enhancement
+- Denoising
+- Contrast adjustment
+- Gamma correction
+- Image hash generation for duplicate detection
 
-1. Clone the repository:
+### Signature Verification
+- Signature detection
+- Signature verification
+- Handwriting analysis
+- Comparison with known signatures
+
+### Document Authenticity
+- Digital signature verification
+- Hash verification
+- Metadata validation
+- Content integrity checks
+
+### Document Analysis
+- Text extraction and analysis
+- Structure analysis
+- Key information identification
+- Report generation
+
+## Installation
+
+1. Install dependencies:
 ```bash
-git clone https://github.com/ks-guy/trump-scanner.git
-cd trump-scanner
+npm install
 ```
 
-2. Set up the environment:
+2. Set up environment variables:
 ```bash
-# Make setup script executable
-chmod +x setup-logging.sh
-
-# Run setup script
-./setup-logging.sh
-```
-
-3. Start the services:
-```bash
-docker-compose up -d
-```
-
-## Service URLs
-
-* Main Application: http://localhost:3000
-* Monitoring:
-  * Grafana: http://localhost:3001 (admin/admin123)
-  * Prometheus: http://localhost:9090
-  * AlertManager: http://localhost:9093
-* Logging:
-  * Kibana: http://localhost:5601
-  * Elasticsearch: http://localhost:9200
-  * Logstash: http://localhost:9600
-* Database:
-  * MySQL: localhost:3306
-* Cache:
-  * Redis: localhost:6379
-* Media:
-  * MeTube: http://localhost:8081
-
-## Running Services
-
-1. Core Services:
-   - Main Application (Node.js)
-   - Scraper Service
-   - Database (MySQL)
-   - Cache (Redis)
-
-2. Monitoring Stack:
-   - Grafana (Metrics visualization)
-   - Prometheus (Metrics collection)
-   - AlertManager (Alert management)
-
-3. Logging Stack:
-   - Elasticsearch (Log storage)
-   - Logstash (Log processing)
-   - Kibana (Log visualization)
-   - Filebeat (Log collection)
-
-4. Media Services:
-   - MeTube (Media downloader)
-
-## Directory Structure
-
-```
-trump-scanner/
-├── src/                    # Source code
-├── documents/              # Scraped documents
-├── data/                  # Application data
-├── logs/                  # Application logs
-├── monitoring/            # Monitoring configurations
-│   ├── alertmanager/     # AlertManager config
-│   ├── prometheus/       # Prometheus config
-│   ├── grafana/         # Grafana dashboards
-│   ├── logstash/        # Logstash config
-│   ├── filebeat/        # Filebeat config
-│   └── elasticsearch/   # Elasticsearch config
-└── docker-compose.yml    # Docker services configuration
-```
-
-## Configuration
-
-1. Environment Variables:
-   * Copy `.env.example` to `.env`
-   * Update variables as needed
-2. Monitoring Setup:
-   * Update email settings in `monitoring/alertmanager/config.yml`
-   * Customize alert rules in `monitoring/prometheus/rules/`
-   * Adjust Grafana dashboards in `monitoring/grafana/provisioning/`
-3. Logging Setup:
-   * Configure log retention in `monitoring/elasticsearch/`
-   * Adjust log patterns in `monitoring/logstash/pipeline/`
-   * Modify log shipping in `monitoring/filebeat/filebeat.yml`
-
-## Deployment
-
-### First-time Setup
-
-1. System Preparation:
-```bash
-# Set up system limits
-echo "vm.max_map_count=262144" | sudo tee -a /etc/sysctl.conf
-sudo sysctl -w vm.max_map_count=262144
-```
-
-2. Create Required Directories:
-```bash
-mkdir -p documents data logs
-chmod -R 755 documents data logs
-```
-
-### Production Deployment
-
-1. Clone and Setup:
-```bash
-git clone https://github.com/ks-guy/trump-scanner.git
-cd trump-scanner
-./setup-logging.sh
-```
-
-2. Configure Production Settings:
-```bash
-# Update environment variables
 cp .env.example .env
-nano .env
-
-# Update monitoring configuration
-nano monitoring/alertmanager/config.yml
+# Edit .env with your configuration
 ```
 
-3. Start Services:
+3. Run the service:
 ```bash
-docker-compose up -d
+npm start
 ```
 
-### Maintenance
+## Usage
 
-1. Update Services:
-```bash
-git pull
-docker-compose build --no-cache
-docker-compose up -d
+### Basic Document Processing
+```javascript
+const documentService = require('./src/services/documentProcessingService');
+
+// Process a document
+const result = await documentService.processDocument('path/to/document.pdf', {
+  ocr: true,
+  verifySignatures: true
+});
 ```
 
-2. Backup Data:
-```bash
-# Backup documents and data
-tar -czf backup-$(date +%Y%m%d).tar.gz documents/ data/
-
-# Backup Elasticsearch indices
-curl -X PUT "localhost:9200/_snapshot/backup" -H 'Content-Type: application/json' -d '{
-  "type": "fs",
-  "settings": {
-    "location": "/backup"
-  }
-}'
+### Image Enhancement
+```javascript
+const enhancedImage = await documentService.enhanceImageQuality('path/to/image.jpg', {
+  denoise: true,
+  enhance: true,
+  contrast: true
+});
 ```
 
-3. Monitor Resources:
-```bash
-# Check container status
-docker-compose ps
-
-# View logs
-docker-compose logs -f
-
-# Monitor resource usage
-docker stats
+### Document Verification
+```javascript
+const verification = await documentService.verifyDocumentAuthenticity(document);
 ```
 
-## Troubleshooting
-
-1. Elasticsearch fails to start:
-```bash
-# Check system limits
-sudo sysctl -w vm.max_map_count=262144
-
-# Check permissions
-sudo chown -R 1000:1000 monitoring/elasticsearch/data
+### Report Generation
+```javascript
+const report = await documentService.generateDocumentReport(document);
 ```
 
-2. Logstash connection issues:
-```bash
-# Check Logstash status
-docker-compose logs logstash
+## API Reference
 
-# Verify Elasticsearch connection
-curl localhost:9200/_cat/health
-```
+### processDocument(documentPath, options)
+Processes a document with specified options.
 
-3. Filebeat not shipping logs:
-```bash
-# Check Filebeat status
-docker-compose logs filebeat
+**Parameters:**
+- `documentPath` (string): Path to the document
+- `options` (object):
+  - `ocr` (boolean): Enable OCR processing
+  - `verifySignatures` (boolean): Enable signature verification
+  - `extractMetadata` (boolean): Enable metadata extraction
 
-# Verify permissions
-sudo chown root monitoring/filebeat/filebeat.yml
-```
+**Returns:** Processed document object
+
+### enhanceImageQuality(imagePath, options)
+Enhances image quality with specified options.
+
+**Parameters:**
+- `imagePath` (string): Path to the image
+- `options` (object):
+  - `denoise` (boolean): Enable denoising
+  - `enhance` (boolean): Enable enhancement
+  - `contrast` (boolean): Enable contrast adjustment
+
+**Returns:** Path to enhanced image
+
+### verifyDocumentAuthenticity(document)
+Verifies document authenticity.
+
+**Parameters:**
+- `document` (object): Document object
+
+**Returns:** Verification result object
+
+### generateDocumentReport(document)
+Generates a detailed report for a document.
+
+**Parameters:**
+- `document` (object): Document object
+
+**Returns:** Report object
+
+## Dependencies
+
+- tesseract.js: OCR processing
+- pdf-parse: PDF parsing
+- mammoth: Word document parsing
+- jimp: Image processing
+- image-hash: Image hash generation
+- exifr: EXIF data extraction
+- pdf-lib: PDF manipulation
+- node-signpdf: PDF signature verification
+- node-forge: Cryptographic operations
 
 ## Contributing
 
@@ -215,12 +146,8 @@ sudo chown root monitoring/filebeat/filebeat.yml
 2. Create your feature branch
 3. Commit your changes
 4. Push to the branch
-5. Create a Pull Request
+5. Create a new Pull Request
 
 ## License
 
-MIT
-
-## About
-
-A comprehensive system for collecting, analyzing, and verifying Trump-related quotes and documents from various sources. 
+This project is licensed under the MIT License - see the LICENSE file for details. 

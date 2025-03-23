@@ -3,12 +3,6 @@ const client = require('prom-client');
 // Create a Registry to register metrics
 const register = new client.Registry();
 
-// Add a default label which is added to all metrics
-client.collectDefaultMetrics({
-    register,
-    prefix: 'scraper_'
-});
-
 // Custom metrics
 const documentsScrapeCounter = new client.Counter({
     name: 'scraper_documents_total',
