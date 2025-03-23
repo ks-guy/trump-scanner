@@ -21,18 +21,19 @@ services:
   scraper:
     build:
       context: .
-      dockerfile: Dockerfile.scraper
+      dockerfile: Dockerfile
     container_name: trump-scanner
     ports:
-      - "9100:9100"  # Expose metrics endpoint
+      - "5555:5555"  # Prisma Studio
     volumes:
       - ./documents:/app/documents
       - ./data:/app/data
+      - ./error_logs:/app/error_logs
     environment:
       - NODE_ENV=production
       - TZ=UTC
-      - METRICS_PORT=9100
       - DATABASE_URL=mysql://scanner_user:scanner_password@db:3306/trump_scanner
+      - SCRAPEOPS_API_KEY=1e3ddfbb-c565-4464-b425-1d59057c7ad0
     restart: unless-stopped
     deploy:
       resources:
@@ -110,7 +111,6 @@ services:
       - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./src/database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
