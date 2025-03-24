@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 # Load environment variables
 if [ -f .env ]; then
@@ -9,18 +10,26 @@ else
 fi
 
 # Wait for MySQL to be ready
-echo "Waiting for MySQL to be ready..."
-until docker-compose exec -T db mysqladmin ping -h"localhost" -P"3306" -u"root" -p"${MYSQL_ROOT_PASSWORD}" --silent; do
+until mysqladmin ping -h"localhost" -u"root" -p"$MYSQL_ROOT_PASSWORD" --silent; do
+    echo "Waiting for MySQL to be ready..."
     sleep 1
 done
 
 # Create database if it doesn't exist
-echo "Creating database if it doesn't exist..."
-docker-compose exec -T db mysql -u"root" -p"${MYSQL_ROOT_PASSWORD}" -e "CREATE DATABASE IF NOT EXISTS ${MYSQL_DATABASE};"
+mysql -u"root" -p"$MYSQL_ROOT_PASSWORD" << EOF
+CREATE DATABASE IF NOT EXISTS trump_scanner;
+EOF
+
+# Create user if it doesn't exist and grant privileges
+mysql -u"root" -p"$MYSQL_ROOT_PASSWORD" << EOF
+CREATE USER IF NOT EXISTS 'trump_scanner'@'%' IDENTIFIED BY 'trump_scanner_password';
+GRANT ALL PRIVILEGES ON trump_scanner.* TO 'trump_scanner'@'%';
+FLUSH PRIVILEGES;
+EOF
 
 # Run Prisma migrations
-echo "Running Prisma migrations..."
-docker-compose exec scraper npx prisma migrate deploy
+cd /app
+npx prisma migrate deploy
 
 # Import data if backup exists
 if [ -f "backups/latest.sql" ]; then
@@ -31,4 +40,4 @@ else
     echo "No backup file found at backups/latest.sql"
 fi
 
-echo "Database initialization completed" 
+echo "Database initialization completed!" 

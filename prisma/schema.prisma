@@ -3,34 +3,44 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model LegalDocument {
+  id          Int      @id @default(autoincrement())
+  url         String   @unique
+  title       String
+  content     String   @db.Text
+  source      String
+  date        DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  quotes      Quote[]
+  metadata    Json?
 }
 
 model Quote {
-  id        Int      @id @default(autoincrement())
-  text      String
-  speaker   String
-  source    String
-  date      DateTime @default(now())
-  context   String?
-  metadata  String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([date])
-  @@index([source])
-  @@index([speaker])
+  id              Int           @id @default(autoincrement())
+  text            String        @db.Text
+  context         String        @db.Text
+  sourceUrl       String
+  sourceType      String
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  legalDocument   LegalDocument? @relation(fields: [legalDocumentId], references: [id])
+  legalDocumentId Int?
+  metadata        Json?
 }
 
 model Source {
-  id         Int        @id @default(autoincrement())
-  name       String
-  url        String     @unique
-  categoryId Int
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
-  documents  Document[]
+  id        Int      @id @default(autoincrement())
+  url       String   @unique
+  type      String
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  metadata  Json?
 }
 
 model Document {
