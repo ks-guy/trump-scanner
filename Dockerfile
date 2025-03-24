@@ -1,59 +1,68 @@
-FROM node:20-slim
+# Use Node.js LTS version
+FROM node:18-slim
 
-# Install Chrome dependencies and Puppeteer requirements
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     chromium \
-    fonts-ipafont-gothic \
-    fonts-wqy-zenhei \
-    fonts-thai-tlwg \
-    fonts-kacst \
-    fonts-freefont-ttf \
-    curl \
+    chromium-driver \
+    fonts-liberation \
+    libasound2 \
+    libatk-bridge2.0-0 \
+    libatk1.0-0 \
+    libatspi2.0-0 \
+    libcups2 \
+    libdbus-1-3 \
+    libexpat1 \
+    libfontconfig1 \
+    libgbm1 \
+    libgcc1 \
+    libglib2.0-0 \
+    libgtk-3-0 \
+    libnspr4 \
+    libnss3 \
+    libpango-1.0-0 \
+    libpangocairo-1.0-0 \
+    libstdc++6 \
+    libx11-6 \
+    libx11-xcb1 \
+    libxcb1 \
+    libxcomposite1 \
+    libxcursor1 \
+    libxdamage1 \
+    libxext6 \
+    libxfixes3 \
+    libxi6 \
+    libxrandr2 \
+    libxrender1 \
+    libxss1 \
+    libxtst6 \
+    lsb-release \
     wget \
-    gnupg \
-    --no-install-recommends \
+    xdg-utils \
     && rm -rf /var/lib/apt/lists/*
 
-# Set environment variables for Puppeteer
-ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
-    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
-
-# Create app directory
+# Set working directory
 WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
+# Install app dependencies
 RUN npm install
 
-# Copy source code
+# Copy app source
 COPY . .
 
 # Create necessary directories
-RUN mkdir -p \
-    documents/legal/pdfs \
-    error_logs \
-    logs \
-    monitoring/prometheus \
-    monitoring/grafana/provisioning \
-    monitoring/alertmanager \
-    monitoring/logstash/config \
-    monitoring/logstash/pipeline \
-    monitoring/filebeat
+RUN mkdir -p logs data
 
-# Generate Prisma client
-RUN npx prisma generate
+# Set environment variables
+ENV NODE_ENV=production
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
-# Run Prisma migrations
-RUN npx prisma migrate deploy
+# Expose port
+EXPOSE 3000
 
-# Expose ports
-EXPOSE 5555 3000 9090 3001 9093 5044 5000 9600 5601
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:3000/health || exit 1
-
-# Start command
-CMD ["npm", "run", "scrape:legal"] 
+# Start the application
+CMD ["npm", "start"] 

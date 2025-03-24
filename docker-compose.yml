@@ -1,123 +1,43 @@
-version: '3.8'
-
 services:
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    build: .
     ports:
       - "3000:3000"
-    volumes:
-      - ./src:/app/src
-      - ./logs:/app/logs
     environment:
       - NODE_ENV=development
       - DB_HOST=db
+      - DB_USER=trump_scanner
+      - DB_PASSWORD=trump_scanner
+      - DB_NAME=trump_scanner
       - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - ELASTICSEARCH_NODE=http://elasticsearch:9200
     depends_on:
       - db
       - redis
-    networks:
-      - trump_scanner_network
-
-  scraper:
-    build: .
-    container_name: trump-scanner
+      - elasticsearch
     volumes:
       - ./src:/app/src
-      - ./prisma:/app/prisma
-      - ./config:/app/config
-      - ./legal_documents:/app/legal_documents
+      - ./logs:/app/logs
       - ./error_logs:/app/error_logs
-    environment:
-      - DATABASE_URL=mysql://trump_scanner:trump_scanner_password@db:3306/trump_scanner
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - REDIS_PASSWORD=trump_scanner_redis_password
-      - ELASTICSEARCH_URL=http://elasticsearch:9200
-      - ELASTICSEARCH_USER=elastic
-      - ELASTICSEARCH_PASSWORD=trump_scanner_elastic_password
-      - SCRAPEOPS_API_KEY=${SCRAPEOPS_API_KEY}
-      - COURT_LISTENER_API_KEY=${COURT_LISTENER_API_KEY}
-      - DOCUMENT_CLOUD_API_KEY=${DOCUMENT_CLOUD_API_KEY}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
-      - GOOGLE_CSE_ID=${GOOGLE_CSE_ID}
-      - LOG_LEVEL=info
-    ports:
-      - "5555:5555"  # Prisma Studio
-      - "3000:3000"  # Application
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      elasticsearch:
-        condition: service_healthy
+      - ./documents:/app/documents
     networks:
       - trump_scanner_network
-
-  prometheus:
-    image: prom/prometheus:latest
-    container_name: trump-scanner-prometheus
-    volumes:
-      - ./prometheus:/etc/prometheus
-      - prometheus_data:/prometheus
-    ports:
-      - "9090:9090"
-    networks:
-      - trump_scanner_network
-
-  grafana:
-    image: grafana/grafana:latest
-    container_name: trump-scanner-grafana
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
-    volumes:
-      - grafana_data:/var/lib/grafana
-    ports:
-      - "3001:3000"
-    depends_on:
-      - prometheus
-    networks:
-      - trump_scanner_network
-
-  alertmanager:
-    image: prom/alertmanager:v0.25.0
-    container_name: trump-scanner-alertmanager
-    volumes:
-      - ./monitoring/alertmanager:/etc/alertmanager
-      - alertmanager_data:/alertmanager
-    ports:
-      - "9093:9093"
-    command:
-      - '--config.file=/etc/alertmanager/config.yml'
-      - '--storage.path=/alertmanager'
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9093/-/healthy"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    networks:
-      - monitoring
 
   db:
     image: mysql:8.0
-    container_name: trump-scanner-db
     environment:
-      - MYSQL_ROOT_PASSWORD=root_password
+      - MYSQL_ROOT_PASSWORD=root
       - MYSQL_DATABASE=trump_scanner
       - MYSQL_USER=trump_scanner
-      - MYSQL_PASSWORD=trump_scanner_password
-    volumes:
-      - mysql_data:/var/lib/mysql
-      - ./prisma:/docker-entrypoint-initdb.d
-      - ./scripts/init-db.sh:/docker-entrypoint-initdb.d/init-db.sh
+      - MYSQL_PASSWORD=trump_scanner
     ports:
       - "3306:3306"
+      - "33060:33060"
+    volumes:
+      - mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "trump_scanner", "-p$$MYSQL_PASSWORD"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$$MYSQL_ROOT_PASSWORD"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -126,14 +46,12 @@ services:
 
   redis:
     image: redis:7.0
-    container_name: trump-scanner-redis
-    command: redis-server --requirepass trump_scanner_redis_password
-    volumes:
-      - redis_data:/data
     ports:
       - "6379:6379"
+    volumes:
+      - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "trump_scanner_redis_password", "ping"]
+      test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -141,94 +59,94 @@ services:
       - trump_scanner_network
 
   elasticsearch:
-    image: elasticsearch:8.11.1
-    container_name: trump-scanner-elasticsearch
+    image: elasticsearch:8.12.1
     environment:
       - discovery.type=single-node
-      - ELASTIC_PASSWORD=trump_scanner_elastic_password
-      - xpack.security.enabled=true
+      - xpack.security.enabled=false
       - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
-    volumes:
-      - elasticsearch_data:/usr/share/elasticsearch/data
     ports:
       - "9200:9200"
+      - "9300:9300"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
     healthcheck:
       test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q 'status.*green'"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - trump_scanner_network
+
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    networks:
+      - trump_scanner_network
+
+  grafana:
+    image: grafana/grafana:10.0.3
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - trump_scanner_network
+
+  alertmanager:
+    image: prom/alertmanager:v0.25.0
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./monitoring/alertmanager/config.yml:/etc/alertmanager/alertmanager.yml
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
     networks:
       - trump_scanner_network
 
   logstash:
     image: docker.elastic.co/logstash/logstash:8.12.1
-    container_name: trump-scanner-logstash
-    volumes:
-      - ./monitoring/logstash/config:/usr/share/logstash/config
-      - ./monitoring/logstash/pipeline:/usr/share/logstash/pipeline
-      - logstash_data:/usr/share/logstash/data
     ports:
       - "5044:5044"
-      - "5000:5000"
       - "9600:9600"
+    volumes:
+      - ./monitoring/logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml
+      - ./monitoring/logstash/pipeline/logstash.conf:/usr/share/logstash/pipeline/logstash.conf
     depends_on:
       - elasticsearch
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9600"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    networks:
-      - monitoring
-
-  kibana:
-    image: docker.elastic.co/kibana/kibana:8.12.1
-    container_name: trump-scanner-kibana
-    environment:
-      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
-    ports:
-      - "5601:5601"
-    depends_on:
-      - elasticsearch
-    healthcheck:
-      test: ["CMD-SHELL", "curl -s http://localhost:5601/api/status | grep -q 'available.*true'"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    networks:
-      - monitoring
-
-  filebeat:
-    image: docker.elastic.co/beats/filebeat:8.12.1
-    container_name: trump-scanner-filebeat
-    volumes:
-      - ./monitoring/filebeat:/usr/share/filebeat
-      - ./logs:/app/logs:ro
-      - ./error_logs:/app/error_logs:ro
-    depends_on:
-      - logstash
-    networks:
-      - monitoring
-
-  loki:
-    image: grafana/loki:latest
-    container_name: trump-scanner-loki
-    volumes:
-      - loki_data:/loki
-    ports:
-      - "3100:3100"
     networks:
       - trump_scanner_network
 
-  promtail:
-    image: grafana/promtail:latest
-    container_name: trump-scanner-promtail
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.12.1
     volumes:
-      - ./promtail:/etc/promtail
-      - ./logs:/var/log/trump-scanner:ro
-      - ./error_logs:/var/log/trump-scanner/errors:ro
+      - ./monitoring/filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml
+      - ./logs:/var/log/trump_scanner
     depends_on:
-      - loki
+      - logstash
+    networks:
+      - trump_scanner_network
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.12.1
+    ports:
+      - "5601:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    depends_on:
+      - elasticsearch
     networks:
       - trump_scanner_network
 
@@ -236,16 +154,8 @@ volumes:
   mysql_data:
   redis_data:
   elasticsearch_data:
-  prometheus_data:
   grafana_data:
-  alertmanager_data:
-  logstash_data:
-  loki_data:
 
 networks:
-  app-network:
-    driver: bridge
-  monitoring:
-    driver: bridge
   trump_scanner_network:
     driver: bridge 

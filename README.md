@@ -1,205 +1,184 @@
-# Trump Scanner
+# Trump Quote Scanner
 
-A comprehensive system for scraping, analyzing, and storing Trump-related legal documents and quotes. This application provides a robust platform for monitoring and analyzing legal documents, media content, and quotes related to Trump.
+A comprehensive tool for scanning, analyzing, and monitoring Trump-related content from various sources.
 
 ## Features
 
-- **Document Scraping**: Automated scraping of legal documents from various sources
-- **Media Processing**: Support for processing PDFs, images, videos, and audio files
-- **Quote Extraction**: Intelligent extraction and analysis of quotes from documents
-- **Sentiment Analysis**: Analysis of document and quote sentiment
-- **Entity Recognition**: Identification of named entities in documents and quotes
-- **Full-Text Search**: Advanced search capabilities using Elasticsearch
-- **Monitoring**: Comprehensive monitoring with Prometheus, Grafana, and Alertmanager
-- **Backup System**: Automated database and file backups
-- **API**: RESTful API for accessing and managing data
-- **Document Management**: Version control and citation tracking
+- Automated scraping of legal documents and news articles
+- Real-time monitoring of new content
+- Advanced text analysis and sentiment detection
+- Elasticsearch-powered search functionality
+- Redis caching for improved performance
+- MySQL database for persistent storage
+- Prometheus metrics and Grafana dashboards
+- AlertManager for notifications
+- Kibana for log visualization
 
 ## Prerequisites
 
-- Node.js >= 18.0.0
-- MySQL >= 8.0
-- Redis >= 6.0
-- Elasticsearch >= 7.0
-- FFmpeg (for media processing)
-- Docker and Docker Compose (optional, for containerized deployment)
+- Docker and Docker Compose
+- Node.js 18 or higher (for local development)
+- At least 4GB of RAM
+- 20GB of free disk space
 
 ## Quick Start
 
 1. Clone the repository:
-   ```bash
-   git clone https://github.com/yourusername/trump-scanner.git
-   cd trump-scanner
-   ```
+```bash
+git clone https://github.com/yourusername/trump-scanner.git
+cd trump-scanner
+```
 
-2. Run the setup script:
-   ```bash
-   npm run setup
-   ```
+2. Create a `.env` file in the root directory:
+```bash
+cp .env.example .env
+```
 
-3. Update the `.env` file with your configuration:
-   ```bash
-   cp .env.example .env
-   # Edit .env with your settings
-   ```
+3. Start the application:
+```bash
+docker-compose up -d
+```
 
-4. Start the application:
-   ```bash
-   npm start
-   ```
+4. Verify the services are running:
+```bash
+docker-compose ps
+```
+
+5. Check the application health:
+```bash
+curl http://localhost:3000/health
+```
 
 ## Docker Deployment
 
-1. Build and start the containers:
-   ```bash
-   npm run docker:build
-   npm run docker:up
-   ```
+The application uses Docker Compose to manage multiple services:
 
-2. Monitor the logs:
-   ```bash
-   npm run docker:logs
-   ```
+- `app`: Main application service
+- `db`: MySQL database
+- `redis`: Redis cache
+- `elasticsearch`: Search engine
+- `prometheus`: Metrics collection
+- `grafana`: Metrics visualization
+- `alertmanager`: Alert management
+- `kibana`: Log visualization
 
-3. Stop the containers:
-   ```bash
-   npm run docker:down
-   ```
+### Starting Services
 
-## Accessing Services
+```bash
+# Start all services
+docker-compose up -d
 
-Once the application is running, you can access:
+# View logs
+docker-compose logs -f
 
-- Main Application: http://localhost:3000
-- Prisma Studio: http://localhost:5555
-- Grafana Dashboard: http://localhost:3001
-- Prometheus: http://localhost:9090
-- Alertmanager: http://localhost:9093
-- Elasticsearch: http://localhost:9200
+# Restart services
+docker-compose restart
 
-## Database Configuration
+# Stop services
+docker-compose down
+```
 
-The application uses MySQL as its primary database. The database is configured with the following default settings:
+### Database Configuration
 
-- Database Name: `trump_scanner`
+The MySQL database is automatically initialized with:
+- Database name: `trump_scanner`
 - Username: `trump_scanner`
-- Password: `trump_scanner_password`
-- Host: `localhost`
-- Port: `3306`
+- Password: `trump_scanner`
+- Required tables are created on startup
 
-To modify these settings, update the `DATABASE_URL` in your `.env` file.
+### Monitoring
+
+- Grafana: http://localhost:3001
+- Kibana: http://localhost:5601
+- Prometheus: http://localhost:9090
+- AlertManager: http://localhost:9093
 
 ## Project Structure
 
 ```
 trump-scanner/
 ├── src/
-│   ├── app.js              # Main application entry point
-│   ├── config/             # Configuration files
-│   ├── services/           # Business logic services
-│   ├── scripts/            # Utility scripts
-│   └── utils/              # Helper utilities
-├── prisma/
-│   └── schema.prisma       # Database schema
-├── documents/              # Document storage
-├── error_logs/            # Error logs
-├── logs/                  # Application logs
-├── monitoring/            # Monitoring configuration
-├── backups/              # Database backups
-├── scripts/              # Setup and utility scripts
-├── .env.example          # Example environment variables
-├── docker-compose.yml    # Docker configuration
-└── package.json          # Project dependencies
+│   ├── config/         # Configuration files
+│   ├── services/       # Core services
+│   ├── scripts/        # Utility scripts
+│   └── index.js        # Application entry point
+├── docker/             # Docker configuration
+├── logs/              # Application logs
+├── data/              # Persistent data
+├── .env.example       # Example environment variables
+├── docker-compose.yml # Docker Compose configuration
+├── Dockerfile         # Application Dockerfile
+└── package.json       # Node.js dependencies
 ```
 
 ## Environment Variables
 
-The application requires several environment variables to be set. See `.env.example` for a complete list of required variables.
-
-Key variables include:
-- `DATABASE_URL`: MySQL connection string
+Required environment variables:
+- `NODE_ENV`: Application environment (development/production)
+- `DB_HOST`: MySQL host
+- `DB_USER`: MySQL username
+- `DB_PASSWORD`: MySQL password
+- `DB_NAME`: MySQL database name
 - `REDIS_HOST`: Redis host
-- `ELASTICSEARCH_NODE`: Elasticsearch URL
-- `JWT_SECRET`: Secret for JWT tokens
-- `API_KEYS`: Various API keys for external services
+- `ELASTICSEARCH_HOST`: Elasticsearch host
+- `LOG_LEVEL`: Logging level
 
 ## Common Docker Commands
 
 ```bash
-# Build containers
-npm run docker:build
+# Build images
+docker-compose build
 
-# Start containers
-npm run docker:up
+# Start services
+docker-compose up -d
 
-# Stop containers
-npm run docker:down
+# Stop services
+docker-compose down
 
 # View logs
-npm run docker:logs
+docker-compose logs -f
 
-# Access container shell
-docker-compose exec app sh
+# Restart services
+docker-compose restart
+
+# Check service status
+docker-compose ps
 ```
 
-## Database Backup and Restore
+## Backup and Restore
 
-### Creating a Backup
-
+### Database Backup
 ```bash
-npm run backup
+docker-compose exec db mysqldump -u trump_scanner -ptrump_scanner trump_scanner > backup.sql
 ```
 
-### Restoring from Backup
-
+### Database Restore
 ```bash
-npm run restore
+docker-compose exec -T db mysql -u trump_scanner -ptrump_scanner trump_scanner < backup.sql
 ```
 
 ## Troubleshooting
 
-### Database Connection Issues
-
-1. Check if MySQL is running:
+1. If services fail to start:
    ```bash
-   docker-compose ps
+   docker-compose down -v
+   docker-compose up -d
    ```
 
-2. Verify database credentials in `.env`
-
-3. Check database logs:
+2. If database connection fails:
    ```bash
-   docker-compose logs db
+   docker-compose restart db
    ```
 
-### Redis Issues
-
-1. Check Redis connection:
+3. If Elasticsearch is not accessible:
    ```bash
-   docker-compose exec redis redis-cli ping
+   docker-compose restart elasticsearch
    ```
 
-2. Verify Redis configuration in `.env`
-
-### Elasticsearch Issues
-
-1. Check Elasticsearch health:
+4. Check service logs:
    ```bash
-   curl http://localhost:9200/_cluster/health
+   docker-compose logs -f [service_name]
    ```
-
-2. Verify Elasticsearch configuration in `.env`
-
-### General Issues
-
-1. Check application logs:
-   ```bash
-   npm run docker:logs
-   ```
-
-2. Verify all required environment variables are set
-
-3. Check disk space and permissions
 
 ## Contributing
 
