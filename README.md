@@ -1,94 +1,170 @@
 # Trump Scanner
 
-A web scraper for collecting legal documents and quotes related to Donald Trump.
+A user-friendly tool that automatically collects and organizes legal documents and quotes related to Donald Trump. Think of it as a digital library that continuously gathers and organizes information from various sources.
 
-## Features
+## What Does It Do?
 
-- Legal document scraping from CourtListener
-- Quote collection from various sources
-- PDF document processing
-- MySQL database storage
-- Prisma Studio for data monitoring
+1. **Collects Legal Documents**
+   - Automatically finds and downloads legal documents from CourtListener
+   - Organizes them by date and type
+   - Makes them easy to search and read
 
-## Prerequisites
+2. **Gathers Quotes**
+   - Finds quotes from various sources
+   - Organizes them by topic and date
+   - Makes them easy to search
 
-- Docker and Docker Compose
-- Node.js 20+ (for local development)
-- MySQL 8.0 (for local development)
+3. **Helps You Find Information**
+   - Powerful search to find specific documents or quotes
+   - Easy-to-use interface to browse through collected data
+   - Keeps track of where information came from
 
-## Quick Start with Docker
+4. **Keeps Everything Safe**
+   - Automatically backs up all collected data
+   - Makes it easy to restore if needed
+   - Keeps your data organized and secure
 
-1. Clone the repository:
-```bash
-git clone https://github.com/ks-guy/trump-scanner.git
-cd trump-scanner
-```
+## How to Use It
 
-2. Create a `.env` file with your ScrapeOps API key:
-```
-SCRAPEOPS_API_KEY=your_api_key_here
-```
+### Getting Started (The Easy Way)
 
-3. Start the services:
-```bash
-docker-compose up -d
-```
+1. **Install Required Software**
+   - Download and install Docker Desktop from [docker.com](https://docker.com)
+   - This is the only software you need to install
 
-4. Access Prisma Studio at http://localhost:5555
+2. **Get the Program**
+   ```bash
+   # Open Command Prompt or Terminal and type:
+   git clone https://github.com/yourusername/trump-scanner.git
+   cd trump-scanner
+   ```
 
-## Local Development Setup
+3. **Set Up Your Keys**
+   - Copy the example settings file:
+     ```bash
+     # On Windows:
+     copy .env.example .env
+     
+     # On Mac/Linux:
+     cp .env.example .env
+     ```
+   - Open the `.env` file in any text editor
+   - Add your API keys (you'll need to get these from the respective services)
 
-1. Install dependencies:
-```bash
-npm install
-```
+4. **Start the Program**
+   ```bash
+   # On Windows:
+   start.bat
+   
+   # On Mac/Linux:
+   ./start.sh
+   ```
 
-2. Set up the database:
-```bash
-npx prisma migrate dev
-```
+### Accessing Your Data
 
-3. Start Prisma Studio:
-```bash
-npx prisma studio
-```
+Once running, you can access different parts of the program:
 
-4. Start the scraper:
-```bash
-npm run scrape:legal
-```
+1. **View Your Data**
+   - Open your web browser
+   - Go to http://localhost:5555
+   - This is where you can see all collected documents and quotes
 
-## Project Structure
+2. **Monitor Progress**
+   - Go to http://localhost:3001
+   - This shows you how the program is running
+   - You can see how many documents have been collected
 
-- `src/services/scrapers/` - Scraper implementations
-- `src/utils/` - Utility functions
-- `prisma/` - Database schema and migrations
-- `documents/` - Downloaded documents
-- `error_logs/` - Error logs
+3. **Search Through Data**
+   - Go to http://localhost:5601
+   - This lets you search through all collected information
 
-## Environment Variables
+### Common Tasks
 
-- `SCRAPEOPS_API_KEY` - Your ScrapeOps API key
-- `DATABASE_URL` - MySQL connection string (default: mysql://scanner_user:scanner_password@localhost:3306/trump_scanner)
+1. **Backing Up Your Data**
+   ```bash
+   # On Windows:
+   scripts\backup-db.bat
+   
+   # On Mac/Linux:
+   ./scripts/backup-db.sh
+   ```
 
-## Docker Commands
+2. **Restoring From Backup**
+   ```bash
+   # On Windows:
+   scripts\init-db.bat
+   
+   # On Mac/Linux:
+   ./scripts/init-db.sh
+   ```
 
-- Start services: `docker-compose up -d`
-- Stop services: `docker-compose down`
-- View logs: `docker-compose logs -f`
-- Rebuild: `docker-compose up -d --build`
+3. **Checking Program Status**
+   ```bash
+   docker-compose ps
+   ```
 
-## Database Backup
+4. **Viewing Recent Activity**
+   ```bash
+   docker-compose logs -f
+   ```
 
-To backup the database:
-```bash
-npx prisma db pull
-```
+### Troubleshooting
+
+If something isn't working:
+
+1. **Program Won't Start**
+   - Make sure Docker Desktop is running
+   - Check that all API keys are set in the `.env` file
+   - Try running `docker-compose down` and then start again
+
+2. **Can't Access the Web Interface**
+   - Make sure the program is running (`docker-compose ps`)
+   - Check that you're using the correct URL
+   - Try refreshing your browser
+
+3. **Data Not Being Collected**
+   - Check the logs for error messages
+   - Verify your API keys are correct
+   - Make sure you have an active internet connection
+
+## What You Need to Know
+
+### Required API Keys
+You'll need these keys to make the program work:
+- ScrapeOps (for web scraping)
+- CourtListener (for legal documents)
+- Document Cloud (for document processing)
+- OpenAI (for text analysis)
+- Anthropic (for additional analysis)
+- Google (for search capabilities)
+
+### Where Your Data is Stored
+- All documents are saved in the `documents` folder
+- Database backups are in the `backups` folder
+- Logs are kept in the `logs` and `error_logs` folders
+
+### How to Keep Everything Running Smoothly
+1. Regularly back up your data
+2. Keep your API keys up to date
+3. Check the monitoring dashboard for any issues
+4. Keep Docker Desktop running
+
+## Need Help?
+
+If you run into any issues:
+1. Check the troubleshooting section above
+2. Look at the error logs in the `error_logs` folder
+3. Create an issue on the GitHub repository
+4. Contact the maintainers
 
 ## Contributing
 
-1. Fork the repository
-2. Create your feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request 
+Want to help improve the program?
+1. Create a GitHub account if you don't have one
+2. Fork this repository
+3. Make your changes
+4. Submit a pull request
+
+## License
+
+This program is free to use and modify under the MIT License. See the LICENSE file for details. 
