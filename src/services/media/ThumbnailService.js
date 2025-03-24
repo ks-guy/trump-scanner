@@ -1,13 +1,13 @@
-const ffmpeg = require('fluent-ffmpeg');
-const sharp = require('sharp');
-const path = require('path');
-const fs = require('fs').promises;
-const os = require('os');
-const { logger } = require('../../utils/logger');
-const { getVideoMetadata } = require('./mediaUtils');
-const { Worker } = require('worker_threads');
-const Queue = require('bull');
-const diskManager = require('../../utils/diskManager');
+import ffmpeg from 'fluent-ffmpeg';
+import sharp from 'sharp';
+import path from 'path';
+import { promises as fs } from 'fs';
+import os from 'os';
+import { logger } from '../../utils/logger.js';
+import { getVideoMetadata } from './mediaUtils.js';
+import { Worker } from 'worker_threads';
+import Queue from 'bull';
+import { diskManager } from '../../utils/diskManager.js';
 
 class ThumbnailService {
     constructor() {
@@ -373,4 +373,4 @@ class ThumbnailService {
     }
 }
 
-module.exports = new ThumbnailService(); 
+export const thumbnailService = new ThumbnailService(); 

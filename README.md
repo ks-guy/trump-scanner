@@ -1,232 +1,205 @@
 # Trump Scanner
 
-A comprehensive web scraper for collecting and analyzing legal documents and quotes related to Donald Trump. The application uses a modern tech stack with containerized services for scalability and maintainability.
+A comprehensive system for scraping, analyzing, and storing Trump-related legal documents and quotes. This application provides a robust platform for monitoring and analyzing legal documents, media content, and quotes related to Trump.
 
 ## Features
 
-- **Legal Document Scraping**
-  - Automated collection from CourtListener
-  - PDF document processing
-  - Document metadata extraction
-  - Source tracking and verification
-
-- **Quote Collection**
-  - Automated quote extraction
-  - Context preservation
-  - Source attribution
-  - Metadata enrichment
-
-- **Data Storage & Search**
-  - MySQL database for structured data
-  - Redis for caching and performance
-  - Elasticsearch for full-text search
-  - Prisma ORM for database management
-
-- **Monitoring & Logging**
-  - Prometheus for metrics collection
-  - Grafana for visualization
-  - Loki for log aggregation
-  - Promtail for log collection
+- **Document Scraping**: Automated scraping of legal documents from various sources
+- **Media Processing**: Support for processing PDFs, images, videos, and audio files
+- **Quote Extraction**: Intelligent extraction and analysis of quotes from documents
+- **Sentiment Analysis**: Analysis of document and quote sentiment
+- **Entity Recognition**: Identification of named entities in documents and quotes
+- **Full-Text Search**: Advanced search capabilities using Elasticsearch
+- **Monitoring**: Comprehensive monitoring with Prometheus, Grafana, and Alertmanager
+- **Backup System**: Automated database and file backups
+- **API**: RESTful API for accessing and managing data
+- **Document Management**: Version control and citation tracking
 
 ## Prerequisites
 
-- Docker (20.10.0 or higher)
-- Docker Compose (2.0.0 or higher)
-- Git
+- Node.js >= 18.0.0
+- MySQL >= 8.0
+- Redis >= 6.0
+- Elasticsearch >= 7.0
+- FFmpeg (for media processing)
+- Docker and Docker Compose (optional, for containerized deployment)
 
 ## Quick Start
 
-1. **Clone the Repository**
-```bash
-git clone https://github.com/yourusername/trump-scanner.git
-cd trump-scanner
-```
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/yourusername/trump-scanner.git
+   cd trump-scanner
+   ```
 
-2. **Set Up Environment**
-```bash
-# Copy the example environment file
-cp .env.example .env
+2. Run the setup script:
+   ```bash
+   npm run setup
+   ```
 
-# Edit the .env file with your credentials
-nano .env
-```
+3. Update the `.env` file with your configuration:
+   ```bash
+   cp .env.example .env
+   # Edit .env with your settings
+   ```
 
-3. **Start the Application**
-```bash
-# Make the start script executable
-chmod +x start.sh
+4. Start the application:
+   ```bash
+   npm start
+   ```
 
-# Run the start script
-./start.sh
-```
+## Docker Deployment
 
-The start script will:
-- Install Docker and Docker Compose if needed
-- Create necessary directories
-- Build and start all containers
-- Initialize the database
-- Set up monitoring and logging
+1. Build and start the containers:
+   ```bash
+   npm run docker:build
+   npm run docker:up
+   ```
 
-## Accessing the Services
+2. Monitor the logs:
+   ```bash
+   npm run docker:logs
+   ```
+
+3. Stop the containers:
+   ```bash
+   npm run docker:down
+   ```
+
+## Accessing Services
 
 Once the application is running, you can access:
 
-- **Main Application**: http://localhost:3000
-- **Prisma Studio** (Database UI): http://localhost:5555
-- **Grafana** (Metrics Dashboard): http://localhost:3001
-  - Default credentials: admin / (password from .env)
-- **Prometheus** (Metrics): http://localhost:9090
-- **Elasticsearch** (Search): http://localhost:9200
+- Main Application: http://localhost:3000
+- Prisma Studio: http://localhost:5555
+- Grafana Dashboard: http://localhost:3001
+- Prometheus: http://localhost:9090
+- Alertmanager: http://localhost:9093
+- Elasticsearch: http://localhost:9200
 
 ## Database Configuration
 
-The application uses three main databases:
+The application uses MySQL as its primary database. The database is configured with the following default settings:
 
-1. **MySQL (Main Database)**
-   - Database: trump_scanner
-   - User: trump_scanner
-   - Password: trump_scanner_password
-   - Port: 3306
+- Database Name: `trump_scanner`
+- Username: `trump_scanner`
+- Password: `trump_scanner_password`
+- Host: `localhost`
+- Port: `3306`
 
-2. **Redis (Cache)**
-   - Password: trump_scanner_redis_password
-   - Port: 6379
-
-3. **Elasticsearch (Search)**
-   - User: elastic
-   - Password: trump_scanner_elastic_password
-   - Port: 9200
-
-All database credentials are managed in the `.env` file.
+To modify these settings, update the `DATABASE_URL` in your `.env` file.
 
 ## Project Structure
 
 ```
 trump-scanner/
-├── config/
-│   └── database.js    # Database configuration
 ├── src/
-│   ├── services/
-│   │   └── scrapers/
-│   │       └── LegalDocumentScraper.js
-│   └── utils/
-│       └── database.js
+│   ├── app.js              # Main application entry point
+│   ├── config/             # Configuration files
+│   ├── services/           # Business logic services
+│   ├── scripts/            # Utility scripts
+│   └── utils/              # Helper utilities
 ├── prisma/
-│   └── schema.prisma  # Database schema
-├── scripts/
-│   ├── init-db.sh     # Database initialization
-│   ├── backup-db.sh   # Database backup
-│   └── start.sh       # Application startup
-├── legal_documents/   # Downloaded PDFs
-├── error_logs/        # Error logs
-├── logs/             # Application logs
-├── backups/          # Database backups
-├── docker-compose.yml
-├── Dockerfile
-└── .env.example
+│   └── schema.prisma       # Database schema
+├── documents/              # Document storage
+├── error_logs/            # Error logs
+├── logs/                  # Application logs
+├── monitoring/            # Monitoring configuration
+├── backups/              # Database backups
+├── scripts/              # Setup and utility scripts
+├── .env.example          # Example environment variables
+├── docker-compose.yml    # Docker configuration
+└── package.json          # Project dependencies
 ```
 
 ## Environment Variables
 
-Required environment variables in `.env`:
+The application requires several environment variables to be set. See `.env.example` for a complete list of required variables.
 
-```env
-# Database Credentials
-DB_HOST=localhost
-DB_PORT=3306
-DB_USER=trump_scanner
-DB_PASSWORD=trump_scanner_password
-DB_NAME=trump_scanner
+Key variables include:
+- `DATABASE_URL`: MySQL connection string
+- `REDIS_HOST`: Redis host
+- `ELASTICSEARCH_NODE`: Elasticsearch URL
+- `JWT_SECRET`: Secret for JWT tokens
+- `API_KEYS`: Various API keys for external services
 
-# Redis Credentials
-REDIS_HOST=localhost
-REDIS_PORT=6379
-REDIS_PASSWORD=trump_scanner_redis_password
-REDIS_DB=0
-
-# Elasticsearch Credentials
-ELASTICSEARCH_URL=http://localhost:9200
-ELASTICSEARCH_USER=elastic
-ELASTICSEARCH_PASSWORD=trump_scanner_elastic_password
-
-# API Keys
-SCRAPEOPS_API_KEY=your_scrapeops_api_key
-COURT_LISTENER_API_KEY=your_court_listener_api_key
-DOCUMENT_CLOUD_API_KEY=your_document_cloud_api_key
-OPENAI_API_KEY=your_openai_api_key
-ANTHROPIC_API_KEY=your_anthropic_api_key
-
-# Monitoring
-GRAFANA_ADMIN_PASSWORD=your_grafana_admin_password
-```
-
-## Docker Commands
-
-Common Docker commands for managing the application:
+## Common Docker Commands
 
 ```bash
-# Start all services
-docker-compose up -d
+# Build containers
+npm run docker:build
 
-# Stop all services
-docker-compose down
+# Start containers
+npm run docker:up
+
+# Stop containers
+npm run docker:down
 
 # View logs
-docker-compose logs -f
+npm run docker:logs
 
-# Rebuild services
-docker-compose up -d --build
-
-# Access MySQL CLI
-docker-compose exec db mysql -u trump_scanner -p
-
-# Access Redis CLI
-docker-compose exec redis redis-cli -a trump_scanner_redis_password
-
-# Access Elasticsearch
-docker-compose exec elasticsearch curl -u elastic:trump_scanner_elastic_password localhost:9200
+# Access container shell
+docker-compose exec app sh
 ```
 
-## Database Backup & Restore
+## Database Backup and Restore
 
 ### Creating a Backup
-```bash
-# For Unix/Linux
-./scripts/backup-db.sh
 
-# For Windows
-.\scripts\backup-db.bat
+```bash
+npm run backup
 ```
 
-Backups are stored in the `backups` directory with timestamps.
-
 ### Restoring from Backup
+
 ```bash
-# Copy your backup file to backups/latest.sql
-# The init-db.sh script will automatically import it
+npm run restore
 ```
 
 ## Troubleshooting
 
-1. **Database Connection Issues**
-   - Check if MySQL container is running: `docker-compose ps db`
-   - Verify credentials in `.env`
-   - Check logs: `docker-compose logs db`
+### Database Connection Issues
 
-2. **Redis Connection Issues**
-   - Verify Redis container is running
-   - Check Redis password in `.env`
-   - View Redis logs: `docker-compose logs redis`
+1. Check if MySQL is running:
+   ```bash
+   docker-compose ps
+   ```
 
-3. **Elasticsearch Issues**
-   - Check if Elasticsearch container is running
-   - Verify memory settings in docker-compose.yml
-   - View Elasticsearch logs: `docker-compose logs elasticsearch`
+2. Verify database credentials in `.env`
 
-4. **General Issues**
-   - Check all container logs: `docker-compose logs`
-   - Verify all services are running: `docker-compose ps`
-   - Check error logs in `error_logs` directory
+3. Check database logs:
+   ```bash
+   docker-compose logs db
+   ```
+
+### Redis Issues
+
+1. Check Redis connection:
+   ```bash
+   docker-compose exec redis redis-cli ping
+   ```
+
+2. Verify Redis configuration in `.env`
+
+### Elasticsearch Issues
+
+1. Check Elasticsearch health:
+   ```bash
+   curl http://localhost:9200/_cluster/health
+   ```
+
+2. Verify Elasticsearch configuration in `.env`
+
+### General Issues
+
+1. Check application logs:
+   ```bash
+   npm run docker:logs
+   ```
+
+2. Verify all required environment variables are set
+
+3. Check disk space and permissions
 
 ## Contributing
 

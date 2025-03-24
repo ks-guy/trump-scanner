@@ -1,7 +1,7 @@
-const { createLogger } = require('../../utils/logger');
-const path = require('path');
-const fs = require('fs').promises;
-const { MediaStorage } = require('../../models/media');
+import { createLogger } from '../../utils/logger.js';
+import path from 'path';
+import { promises as fs } from 'fs';
+import { MediaStorage } from '../../models/media.js';
 
 class StorageService {
     constructor() {
@@ -160,4 +160,4 @@ class StorageService {
     }
 }
 
-module.exports = StorageService; 
+export class StorageService {} 

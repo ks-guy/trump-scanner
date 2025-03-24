@@ -1,7 +1,7 @@
-const Redis = require('ioredis');
-const { logger } = require('../../utils/logger');
-const compressionService = require('./CompressionService');
-const cacheAnalyticsService = require('./CacheAnalyticsService');
+import Redis from 'ioredis';
+import { logger } from '../../utils/logger.js';
+import { compressionService } from './CompressionService.js';
+import { cacheAnalyticsService } from './CacheAnalyticsService.js';
 
 class RedisService {
     constructor() {
@@ -158,4 +158,4 @@ class RedisService {
     }
 }
 
-module.exports = new RedisService(); 
+export const redisService = new RedisService(); 

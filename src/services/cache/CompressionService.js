@@ -1,9 +1,9 @@
-const zlib = require('zlib');
-const { promisify } = require('util');
-const { logger } = require('../../utils/logger');
+import { gzip as gzipSync, gunzip as gunzipSync } from 'zlib';
+import { promisify } from 'util';
+import { logger } from '../../utils/logger.js';
 
-const gzip = promisify(zlib.gzip);
-const gunzip = promisify(zlib.gunzip);
+const gzip = promisify(gzipSync);
+const gunzip = promisify(gunzipSync);
 
 class CompressionService {
     constructor() {
@@ -54,4 +54,4 @@ class CompressionService {
     }
 }
 
-module.exports = new CompressionService(); 
+export const compressionService = new CompressionService(); 

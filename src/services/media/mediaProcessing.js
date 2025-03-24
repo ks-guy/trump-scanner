@@ -1,10 +1,10 @@
-const { createLogger } = require('../../utils/logger');
-const ytdl = require('ytdl-core');
-const ffmpeg = require('fluent-ffmpeg');
-const path = require('path');
-const fs = require('fs').promises;
-const { promisify } = require('util');
-const exec = promisify(require('child_process').exec);
+import { createLogger } from '../../utils/logger.js';
+import ytdl from 'ytdl-core';
+import ffmpeg from 'fluent-ffmpeg';
+import path from 'path';
+import { promises as fs } from 'fs';
+import { promisify } from 'util';
+import { exec } from 'child_process';
 
 const logger = createLogger('MediaProcessing');
 
@@ -117,8 +117,9 @@ async function getVideoInfo(filePath) {
     }
 }
 
-module.exports = {
+export {
     downloadVideo,
     extractAudio,
-    generateThumbnail
+    generateThumbnail,
+    getVideoInfo
 }; 

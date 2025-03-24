@@ -1,15 +1,15 @@
-const { v4: uuidv4 } = require('uuid');
-const Bull = require('bull');
-const path = require('path');
-const fs = require('fs').promises;
-const { logger } = require('../../utils/logger');
-const { MediaService } = require('./MediaService');
-const { db } = require('../../config/database');
-const metricsCollector = require('./MetricsCollector');
-const videoCompressionService = require('./VideoCompressionService');
-const { getVideoMetadata, generateCompressionSettings } = require('./mediaUtils');
-const thumbnailService = require('./ThumbnailService');
-const diskManager = require('../../utils/diskManager');
+import { v4 as uuidv4 } from 'uuid';
+import Bull from 'bull';
+import path from 'path';
+import { promises as fs } from 'fs';
+import { logger } from '../../utils/logger.js';
+import { MediaService } from './MediaService.js';
+import { db } from '../../config/database.js';
+import { metricsCollector } from './MetricsCollector.js';
+import { videoCompressionService } from './VideoCompressionService.js';
+import { getVideoMetadata, generateCompressionSettings } from './mediaUtils.js';
+import { thumbnailService } from './ThumbnailService.js';
+import { diskManager } from '../../utils/diskManager.js';
 
 class BatchProcessingService {
     constructor() {
@@ -423,4 +423,4 @@ class BatchProcessingService {
     }
 }
 
-module.exports = new BatchProcessingService(); 
+export const batchProcessingService = new BatchProcessingService(); 

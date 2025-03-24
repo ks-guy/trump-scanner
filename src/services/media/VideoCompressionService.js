@@ -1,8 +1,8 @@
-const ffmpeg = require('fluent-ffmpeg');
-const path = require('path');
-const fs = require('fs').promises;
-const { logger } = require('../../utils/logger');
-const { getVideoMetadata } = require('./mediaUtils');
+import ffmpeg from 'fluent-ffmpeg';
+import path from 'path';
+import { promises as fs } from 'fs';
+import { logger } from '../../utils/logger.js';
+import { getVideoMetadata } from './mediaUtils.js';
 
 class VideoCompressionService {
     constructor() {
@@ -306,4 +306,4 @@ class VideoCompressionService {
     }
 }
 
-module.exports = new VideoCompressionService(); 
+export const videoCompressionService = new VideoCompressionService(); 

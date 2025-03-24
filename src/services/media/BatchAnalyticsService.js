@@ -1,7 +1,7 @@
-const { db } = require('../../config/database');
-const Bull = require('bull');
-const os = require('os');
-const { logger } = require('../../utils/logger');
+import { db } from '../../config/database.js';
+import Bull from 'bull';
+import os from 'os';
+import { logger } from '../../utils/logger.js';
 
 class BatchAnalyticsService {
     constructor() {
@@ -157,4 +157,4 @@ class BatchAnalyticsService {
     }
 }
 
-module.exports = new BatchAnalyticsService(); 
+export const batchAnalyticsService = new BatchAnalyticsService(); 

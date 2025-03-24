@@ -1,9 +1,9 @@
-const { createLogger } = require('../../utils/logger');
-const { downloadVideo, extractAudio, generateThumbnail } = require('./mediaProcessing');
-const { MediaContent, MediaDownloadQueue, MediaProcessingLogs } = require('../../models/media');
-const { StorageService } = require('./StorageService');
-const path = require('path');
-const fs = require('fs').promises;
+import { createLogger } from '../../utils/logger.js';
+import { downloadVideo, extractAudio, generateThumbnail } from './mediaProcessing.js';
+import { MediaContent, MediaDownloadQueue, MediaProcessingLogs } from '../../models/media.js';
+import { StorageService } from './StorageService.js';
+import path from 'path';
+import { promises as fs } from 'fs';
 
 class MediaService {
     constructor() {
@@ -209,4 +209,4 @@ class MediaService {
     }
 }
 
-module.exports = MediaService; 
+export class MediaService {} 

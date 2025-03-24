@@ -1,10 +1,11 @@
-const fs = require('fs').promises;
-const path = require('path');
-const { createGzip } = require('zlib');
-const { pipeline } = require('stream');
-const { promisify } = require('util');
-const { MediaContent } = require('../../models/media');
-const { logger } = require('../../utils/logger');
+import { promises as fs } from 'fs';
+import path from 'path';
+import { createGzip } from 'zlib';
+import { pipeline } from 'stream';
+import { promisify } from 'util';
+import { MediaContent } from '../../models/media.js';
+import { logger } from '../../utils/logger.js';
+import tar from 'tar';
 
 const pipelineAsync = promisify(pipeline);
 
@@ -52,7 +53,6 @@ class BackupService {
             await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2));
 
             // Create tar archive of media files
-            const tar = require('tar');
             await tar.create(
                 {
                     gzip: true,
@@ -90,7 +90,6 @@ class BackupService {
             const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8'));
 
             // Extract backup
-            const tar = require('tar');
             await tar.extract({
                 file: backupPath,
                 cwd: this.mediaDir
@@ -190,4 +189,4 @@ class BackupService {
     }
 }
 
-module.exports = new BackupService(); 
+export const backupService = new BackupService(); 

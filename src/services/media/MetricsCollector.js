@@ -1,9 +1,9 @@
-const { db } = require('../../config/database');
-const os = require('os');
-const Bull = require('bull');
-const { promisify } = require('util');
-const exec = promisify(require('child_process').exec);
-const { logger } = require('../../utils/logger');
+import { db } from '../../config/database.js';
+import os from 'os';
+import Bull from 'bull';
+import { promisify } from 'util';
+import { exec } from 'child_process';
+import { logger } from '../../utils/logger.js';
 
 class MetricsCollector {
     constructor() {
@@ -283,4 +283,4 @@ class MetricsCollector {
     }
 }
 
-module.exports = new MetricsCollector(); 
+export const metricsCollector = new MetricsCollector(); 

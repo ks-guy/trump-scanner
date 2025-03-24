@@ -1,6 +1,6 @@
-const ffmpeg = require('fluent-ffmpeg');
-const { promisify } = require('util');
-const { logger } = require('../../utils/logger');
+import ffmpeg from 'fluent-ffmpeg';
+import { promisify } from 'util';
+import { logger } from '../../utils/logger.js';
 
 /**
  * Get video metadata using ffprobe
@@ -153,7 +153,7 @@ async function isCodecSupported(codec) {
     }
 }
 
-module.exports = {
+export {
     getVideoMetadata,
     calculateOptimalBitrate,
     generateCompressionSettings,
