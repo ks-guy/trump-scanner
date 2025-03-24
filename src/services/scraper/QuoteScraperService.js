@@ -1,8 +1,15 @@
 import puppeteer from 'puppeteer';
-import { delay, retry } from '../../utils/helpers.js';
-import { logger } from '../../utils/logger.js';
+import { sleep, randomDelay, retry } from '../../utils/helpers.js';
+import { createLoggerComponent } from '../../utils/logger.js';
 import { getRandomUserAgent } from '../../utils/userAgents.js';
 import { Quote } from '../../models/Quote.js';
+import { PrismaClient } from '@prisma/client';
+import { ProxyManager } from '../../utils/proxyManager.js';
+import axios from 'axios';
+import * as cheerio from 'cheerio';
+
+const logger = createLoggerComponent('QuoteScraperService');
+const prisma = new PrismaClient();
 
 export class QuoteScraperService {
     constructor(config = {}) {
@@ -119,7 +126,7 @@ export class QuoteScraperService {
             }
 
             // Skip already scraped URLs unless they are test files
-            if (!isTestFile && await this.hasBeenScraped(url)) {
+            if (!isTestFile && await Quote.findBySourceUrl(url).length > 0) {
                 logger.info(`URL ${url} has already been scraped. Skipping...`);
                 return [];
             }
@@ -132,7 +139,7 @@ export class QuoteScraperService {
                 Math.random() * (this.config.requestDelay.max - this.config.requestDelay.min) 
                 + this.config.requestDelay.min
             );
-            await delay(delayTime);
+            await sleep(delayTime);
 
             try {
                 // Navigate to URL with retry logic
@@ -147,8 +154,11 @@ export class QuoteScraperService {
                             throw new Error(`HTTP ${response.status()}: ${response.statusText()}`);
                         }
                     },
-                    this.config.maxRetries,
-                    `Failed to load URL: ${url}`
+                    {
+                        maxRetries: this.config.maxRetries,
+                        initialDelay: 1000,
+                        shouldRetry: (error) => !error.message.includes('404')
+                    }
                 );
             } catch (navigationError) {
                 // Handle navigation errors (404, network issues, etc.)
@@ -166,11 +176,8 @@ export class QuoteScraperService {
             if (!isTestFile && quotes.length > 0) {
                 await Quote.bulkInsert(quotes.map(q => ({
                     source_url: url,
-                    quote_text: q.text,
-                    context: {
-                        timestamp: q.timestamp,
-                        ...q.context
-                    }
+                    text: q.text,
+                    context: q.context || {}
                 })));
             }
 
@@ -232,7 +239,7 @@ export class QuoteScraperService {
                 Math.random() * (this.config.requestDelay.max - this.config.requestDelay.min) 
                 + this.config.requestDelay.min
             );
-            await delay(delayTime);
+            await sleep(delayTime);
 
             // Navigate to page and wait for content
             await page.goto(sourceUrl, { waitUntil: 'networkidle0', timeout: 60000 });
@@ -371,7 +378,8 @@ export class QuoteScraperService {
         const hasSocialFeed = await page.$('.social-feed') !== null;
         if (hasSocialFeed) return 'social';
 
-        throw new Error('Unknown page format');
+        // Default to article format if no specific format is detected
+        return 'article';
     }
 
     get selectors() {
@@ -396,6 +404,36 @@ export class QuoteScraperService {
                         timestamp: '.post-timestamp',
                         author: '.post-user',
                         stats: '.post-stats'
+                    }
+                }
+            },
+            'www.foxnews.com': {
+                formats: {
+                    article: {
+                        quoteContainer: '.article-body p',
+                        quoteText: 'p',
+                        attribution: 'p',
+                        timestamp: 'time.article-date'
+                    }
+                }
+            },
+            'www.breitbart.com': {
+                formats: {
+                    article: {
+                        quoteContainer: '.entry-content p',
+                        quoteText: 'p',
+                        attribution: 'p',
+                        timestamp: 'time.updated'
+                    }
+                }
+            },
+            'www.newsmax.com': {
+                formats: {
+                    article: {
+                        quoteContainer: '.article-body p',
+                        quoteText: 'p',
+                        attribution: 'p',
+                        timestamp: '.article-date'
                     }
                 }
             }

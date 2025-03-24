@@ -1,9 +1,11 @@
 import puppeteer from 'puppeteer';
-import logger from '../../utils/logger.js';
+import { createLoggerComponent } from '../../utils/logger.js';
 import { sleep, randomDelay, retry } from '../../utils/helpers.js';
 import { Quote } from '../../models/Quote.js';
 import { ProxyManager } from '../../utils/proxyManager.js';
 import fs from 'fs/promises';
+
+const logger = createLoggerComponent('TruthSocialScraper');
 
 class TruthSocialScraper {
     constructor(config = {}) {

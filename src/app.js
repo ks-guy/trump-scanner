@@ -1,61 +1,42 @@
-const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
-const compression = require('compression');
-const { logger } = require('./utils/logger');
-const mediaRoutes = require('./routes/mediaRoutes');
-const searchRoutes = require('./routes/searchRoutes');
-const metricsRoutes = require('./routes/metricsRoutes');
-const systemMetrics = require('./services/monitoring/SystemMetricsService');
-const cacheWarmingService = require('./services/cache/CacheWarmingService');
-const { initializeDatabase } = require('./database/connection');
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import compression from 'compression';
+import bodyParser from 'body-parser';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+import { logger } from './utils/logger.js';
+import { metricsMiddleware } from './middleware/metrics.js';
+import { errorHandler } from './middleware/errorHandler.js';
+import { rateLimiter } from './middleware/rateLimiter.js';
+import { setupRoutes } from './routes/index.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const app = express();
 
 // Middleware
-app.use(helmet());
 app.use(cors());
+app.use(helmet());
 app.use(compression());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(metricsMiddleware);
+app.use(rateLimiter);
 
-// Routes
-app.use('/api/media', mediaRoutes);
-app.use('/api/search', searchRoutes);
-app.use('/api/metrics', metricsRoutes);
+// Static files
+app.use(express.static(join(__dirname, '../public')));
 
-// Start system metrics collection
-systemMetrics.start().catch(err => {
-    logger.error('Failed to start system metrics collection:', err);
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok' });
 });
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-    logger.error('Unhandled error:', err);
-    res.status(500).json({ error: 'Internal server error' });
-});
+// Setup routes
+setupRoutes(app);
 
-// Initialize application
-const PORT = process.env.PORT || 3000;
+// Error handling
+app.use(errorHandler);
 
-async function startServer() {
-    try {
-        // Initialize database
-        await initializeDatabase();
-
-        // Start cache warming service
-        cacheWarmingService.startPeriodicWarming();
-
-        // Start server
-        app.listen(PORT, () => {
-            logger.info(`Server is running on port ${PORT}`);
-        });
-    } catch (error) {
-        logger.error('Failed to start server:', error);
-        process.exit(1);
-    }
-}
-
-startServer();
-
-module.exports = app; 
+export default app; 

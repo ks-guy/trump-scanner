@@ -1,34 +1,32 @@
-const USER_AGENTS = [
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 Edg/122.0.0.0',
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0',
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.3.1 Safari/605.1.15',
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 OPR/108.0.0.0',
-    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-    'Mozilla/5.0 (iPhone; CPU iPhone OS 17_3_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.3.1 Mobile/15E148 Safari/604.1',
-    'Mozilla/5.0 (iPad; CPU OS 17_3_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.3.1 Mobile/15E148 Safari/604.1',
-    'Mozilla/5.0 (Linux; Android 14; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36'
+const userAgents = [
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:89.0) Gecko/20100101 Firefox/89.0',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:89.0) Gecko/20100101 Firefox/89.0',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Edge/91.0.864.59',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.1 Safari/605.1.15'
 ];
 
 let lastUsedIndex = -1;
 
 /**
  * Get a random user agent from the list
- * @returns {string} Random user agent string
+ * @returns {string} A random user agent string
  */
-export const getRandomUserAgent = () => {
-    const index = Math.floor(Math.random() * USER_AGENTS.length);
-    return USER_AGENTS[index];
-};
+export function getRandomUserAgent() {
+    const index = Math.floor(Math.random() * userAgents.length);
+    return userAgents[index];
+}
 
 /**
  * Get the next user agent in sequence
  * @returns {string} Next user agent string
  */
 export const getNextUserAgent = () => {
-    lastUsedIndex = (lastUsedIndex + 1) % USER_AGENTS.length;
-    return USER_AGENTS[lastUsedIndex];
+    lastUsedIndex = (lastUsedIndex + 1) % userAgents.length;
+    return userAgents[lastUsedIndex];
 };
 
 /**
@@ -36,8 +34,8 @@ export const getNextUserAgent = () => {
  * @param {string} userAgent - User agent string to add
  */
 export const addUserAgent = (userAgent) => {
-    if (!USER_AGENTS.includes(userAgent)) {
-        USER_AGENTS.push(userAgent);
+    if (!userAgents.includes(userAgent)) {
+        userAgents.push(userAgent);
     }
 };
 
@@ -45,4 +43,4 @@ export const addUserAgent = (userAgent) => {
  * Get all available user agents
  * @returns {string[]} Array of user agent strings
  */
-export const getAllUserAgents = () => [...USER_AGENTS]; 
+export const getAllUserAgents = () => [...userAgents]; 

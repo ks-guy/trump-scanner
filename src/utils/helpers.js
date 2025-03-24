@@ -4,23 +4,21 @@
 
 /**
  * Sleep for a specified number of milliseconds
- * @param {number} ms - Milliseconds to sleep
- * @returns {Promise} Promise that resolves after the delay
+ * @param {number} ms - Number of milliseconds to sleep
+ * @returns {Promise<void>}
  */
-export const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+export const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 /**
  * Generate a random delay between min and max milliseconds
  * @param {number} min - Minimum delay in milliseconds
  * @param {number} max - Maximum delay in milliseconds
- * @returns {Promise} - Resolves after the random delay
+ * @returns {Promise<void>}
  */
-export function randomDelay(min, max) {
-    return () => new Promise(resolve => {
-        const delay = Math.floor(Math.random() * (max - min + 1)) + min;
-        setTimeout(resolve, delay);
-    });
-}
+export const randomDelay = async (min, max) => {
+    const delay = Math.floor(Math.random() * (max - min) + min);
+    await sleep(delay);
+};
 
 /**
  * Rate limiter class to manage request rates
@@ -39,7 +37,7 @@ export class RateLimiter {
         if (this.requests.length >= this.maxRequests) {
             const oldestRequest = this.requests[0];
             const waitTime = oldestRequest + this.timeWindow - now;
-            await delay(waitTime);
+            await sleep(waitTime);
         }
         
         this.requests.push(now);
@@ -49,24 +47,37 @@ export class RateLimiter {
 /**
  * Retry a function with exponential backoff
  * @param {Function} fn - Function to retry
- * @param {number} maxRetries - Maximum number of retries
- * @param {string} errorMessage - Error message to log
- * @returns {Promise} Promise that resolves with the function result
+ * @param {Object} options - Retry options
+ * @param {number} options.maxRetries - Maximum number of retries (default: 3)
+ * @param {number} options.initialDelay - Initial delay in milliseconds (default: 1000)
+ * @param {Function} options.shouldRetry - Function to determine if retry should be attempted (default: always retry)
+ * @returns {Promise<any>}
  */
-export const retry = async (fn, maxRetries = 3, errorMessage = '') => {
+export const retry = async (fn, options = {}) => {
+    const {
+        maxRetries = 3,
+        initialDelay = 1000,
+        shouldRetry = () => true
+    } = options;
+
     let lastError;
+    
     for (let attempt = 0; attempt < maxRetries; attempt++) {
         try {
             return await fn();
         } catch (error) {
             lastError = error;
-            if (attempt < maxRetries - 1) {
-                const delayTime = Math.min(1000 * Math.pow(2, attempt), 10000);
-                await delay(delayTime);
+            
+            if (attempt === maxRetries - 1 || !shouldRetry(error)) {
+                throw error;
             }
+
+            const delay = initialDelay * Math.pow(2, attempt);
+            await sleep(delay);
         }
     }
-    throw new Error(`${errorMessage}: ${lastError.message}`);
+
+    throw lastError;
 };
 
 /**

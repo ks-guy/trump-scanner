@@ -1,89 +1,89 @@
 import winston from 'winston';
-import path from 'path';
+import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __dirname = dirname(__filename);
 
 // Create logs directory if it doesn't exist
-const logsDir = path.join(process.cwd(), 'logs');
+const logsDir = join(__dirname, '../../logs');
 if (!fs.existsSync(logsDir)) {
     fs.mkdirSync(logsDir, { recursive: true });
 }
 
-const customFormat = winston.format.printf(({ level, message, timestamp, ...metadata }) => {
-    let msg = `${timestamp} [${level}] ${message}`;
-    if (Object.keys(metadata).length > 0) {
-        msg += ` ${JSON.stringify(metadata)}`;
-    }
-    return msg;
-});
+const logDir = join(__dirname, '../../logs');
+const errorLogPath = join(logDir, 'error.log');
+const combinedLogPath = join(logDir, 'combined.log');
+
+const logFormat = winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.json()
+);
 
 const logger = winston.createLogger({
-    level: 'info',
-    format: winston.format.combine(
-        winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-        winston.format.metadata({ fillExcept: ['message', 'level', 'timestamp'] }),
-        customFormat
-    ),
+    level: process.env.LOG_LEVEL || 'info',
+    format: logFormat,
     transports: [
-        new winston.transports.File({ 
-            filename: path.join(logsDir, 'error.log'), 
-            level: 'error' 
+        new winston.transports.File({
+            filename: errorLogPath,
+            level: 'error'
         }),
-        new winston.transports.File({ 
-            filename: path.join(logsDir, 'combined.log') 
-        }),
-        new winston.transports.Console({
-            format: winston.format.combine(
-                winston.format.colorize(),
-                winston.format.simple()
-            )
+        new winston.transports.File({
+            filename: combinedLogPath
         })
     ]
 });
 
-export const createLogger = (module) => {
-    return {
-        info: (message, meta = {}) => logger.info(message, { module, ...meta }),
-        error: (message, meta = {}) => logger.error(message, { module, ...meta }),
-        warn: (message, meta = {}) => logger.warn(message, { module, ...meta }),
-        debug: (message, meta = {}) => logger.debug(message, { module, ...meta })
-    };
-};
+// If we're not in production, log to the console as well
+if (process.env.NODE_ENV !== 'production') {
+    logger.add(new winston.transports.Console({
+        format: winston.format.combine(
+            winston.format.colorize(),
+            winston.format.simple()
+        )
+    }));
+}
+
+export function createLogger(module) {
+    return winston.createLogger({
+        level: process.env.LOG_LEVEL || 'info',
+        format: logFormat,
+        defaultMeta: { module },
+        transports: [
+            new winston.transports.File({
+                filename: errorLogPath,
+                level: 'error'
+            }),
+            new winston.transports.File({
+                filename: combinedLogPath
+            })
+        ]
+    });
+}
 
 /**
  * Create a logger instance for a specific component
  * @param {string} component - The name of the component
  * @returns {winston.Logger} - The configured logger instance
  */
-export function createLoggerComponent(component) {
-    const logger = winston.createLogger({
-        level: 'info',
-        format: winston.format.combine(
-            winston.format.timestamp(),
-            winston.format.json()
-        ),
-        defaultMeta: { component },
-        transports: [
-            new winston.transports.File({
-                filename: path.join(__dirname, '../../error_logs/error.log'),
-                level: 'error'
-            }),
-            new winston.transports.File({
-                filename: path.join(__dirname, '../../error_logs/combined.log')
-            })
-        ]
-    });
-
-    if (process.env.NODE_ENV !== 'production') {
-        logger.add(new winston.transports.Console({
-            format: winston.format.simple()
-        }));
-    }
-
-    return logger;
+export function createLoggerComponent(componentName) {
+    return {
+        info: (message, ...args) => {
+            console.log(`[${componentName}] INFO:`, message, ...args);
+        },
+        warn: (message, ...args) => {
+            console.warn(`[${componentName}] WARN:`, message, ...args);
+        },
+        error: (message, ...args) => {
+            console.error(`[${componentName}] ERROR:`, message, ...args);
+        },
+        debug: (message, ...args) => {
+            if (process.env.DEBUG) {
+                console.debug(`[${componentName}] DEBUG:`, message, ...args);
+            }
+        }
+    };
 }
 
 export { logger }; 

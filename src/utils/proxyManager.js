@@ -4,9 +4,12 @@ import { fileURLToPath } from 'url';
 import { logger } from './logger.js';
 import fetch from 'node-fetch';
 import { HttpsProxyAgent } from 'https-proxy-agent';
+import { createLoggerComponent } from './logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+const loggerProxyManager = createLoggerComponent('ProxyManager');
 
 export class ProxyManager {
     constructor() {
@@ -29,7 +32,7 @@ export class ProxyManager {
             await this.loadProxies();
             await this.validateProxies();
         } catch (error) {
-            logger.error('Error initializing proxy manager:', error);
+            loggerProxyManager.error('Error initializing proxy manager:', error);
         }
     }
 
@@ -40,38 +43,53 @@ export class ProxyManager {
      */
     async loadProxies() {
         try {
-            // Try to read proxies from file
-            const content = await fs.readFile(this.proxyFile, 'utf-8');
-            this.proxies = content
-                .split('\n')
-                .map(line => line.trim())
-                .filter(line => line && !line.startsWith('#'));
-
-            if (this.proxies.length === 0) {
-                logger.warn('No proxies found in proxies.txt');
+            // Check if file exists first
+            try {
+                await fs.access(this.proxyFile);
+            } catch (error) {
+                loggerProxyManager.warn(`Proxy file ${this.proxyFile} does not exist`);
                 return false;
             }
 
-            logger.info(`Loaded ${this.proxies.length} proxies from file`);
+            const content = await fs.readFile(this.proxyFile, 'utf-8');
+            const newProxies = content
+                .split('\n')
+                .filter(line => line.trim() && !line.startsWith('#'))
+                .map(line => {
+                    const [host, port, username, password] = line.split(':');
+                    return {
+                        host,
+                        port: parseInt(port),
+                        username,
+                        password
+                    };
+                });
+
+            // Only add proxies that aren't already in the list
+            for (const proxy of newProxies) {
+                if (!this.proxies.some(p => p.host === proxy.host && p.port === proxy.port)) {
+                    this.proxies.push(proxy);
+                }
+            }
+
+            loggerProxyManager.info(`Loaded ${this.proxies.length} proxies`);
             return true;
         } catch (error) {
-            if (error.code === 'ENOENT') {
-                logger.warn('No proxies.txt file found');
-            } else {
-                logger.error('Error loading proxies:', error);
-            }
+            loggerProxyManager.error('Error loading proxies:', error);
             return false;
         }
     }
 
     /**
      * Get a working proxy
-     * @returns {Promise<string|null>} Proxy string or null if no working proxies
+     * @returns {Promise<Object|null>} Proxy object or null if no working proxies
      */
     async getProxy() {
         if (this.proxies.length === 0) {
-            logger.warn('No proxies available');
-            return null;
+            const loaded = await this.loadProxies();
+            if (!loaded || this.proxies.length === 0) {
+                return null;
+            }
         }
 
         const proxy = this.proxies[this.currentIndex];
@@ -85,7 +103,7 @@ export class ProxyManager {
      * @returns {Promise<void>}
      */
     async validateProxies() {
-        logger.info('Starting proxy validation...');
+        loggerProxyManager.info('Starting proxy validation...');
         this.lastCheck = Date.now();
 
         const validationPromises = this.proxies.map(proxy => this.validateProxy(proxy));
@@ -96,21 +114,22 @@ export class ProxyManager {
             !this.failedProxies.has(proxy)
         );
 
-        logger.info(`Proxy validation complete. ${this.proxies.length} working proxies remaining.`);
+        loggerProxyManager.info(`Proxy validation complete. ${this.proxies.length} working proxies remaining.`);
     }
 
     /**
      * Validate a single proxy
      * @private
-     * @param {string} proxy Proxy string
+     * @param {Object} proxy Proxy object
      * @returns {Promise<void>}
      */
     async validateProxy(proxy) {
         let retries = 0;
         while (retries < this.maxRetries) {
             try {
+                const proxyUrl = `http://${proxy.host}:${proxy.port}`;
                 const response = await fetch('https://truthsocial.com', {
-                    agent: new HttpsProxyAgent(proxy),
+                    agent: new HttpsProxyAgent(proxyUrl),
                     timeout: this.timeout
                 });
 
@@ -121,7 +140,7 @@ export class ProxyManager {
                 retries++;
                 if (retries === this.maxRetries) {
                     this.failedProxies.add(proxy);
-                    logger.warn(`Proxy ${proxy} failed validation:`, error.message);
+                    loggerProxyManager.warn(`Proxy ${proxy.host}:${proxy.port} failed validation:`, error.message);
                 }
                 await new Promise(resolve => setTimeout(resolve, 1000 * retries));
             }
@@ -130,12 +149,17 @@ export class ProxyManager {
 
     /**
      * Mark a proxy as failed
-     * @param {string} proxy Proxy string
+     * @param {Object} proxy Proxy object
      */
-    markProxyAsFailed(proxy) {
-        if (this.failedProxies.has(proxy)) {
-            this.failedProxies.delete(proxy);
-            logger.warn(`Proxy ${proxy} marked as failed`);
+    async markProxyAsFailed(proxy) {
+        // Remove failed proxy from the list
+        this.proxies = this.proxies.filter(p => 
+            p.host !== proxy.host || p.port !== proxy.port
+        );
+        
+        // If we're running low on proxies, try to reload
+        if (this.proxies.length < 5) {
+            await this.loadProxies();
         }
     }
 
@@ -181,18 +205,32 @@ export class ProxyManager {
         return [...this.proxies];
     }
 
-    addProxy(proxy) {
-        if (!this.proxies.includes(proxy)) {
+    /**
+     * Add a new proxy
+     * @param {Object} proxy Proxy object
+     */
+    async addProxy(proxy) {
+        // Check if proxy already exists
+        if (!this.proxies.some(p => p.host === proxy.host && p.port === proxy.port)) {
             this.proxies.push(proxy);
+            await this.saveProxies();
         }
     }
 
+    /**
+     * Save proxies to file
+     * @private
+     */
     async saveProxies() {
         try {
-            await fs.writeFile(this.proxyFile, this.proxies.join('\n'));
-            logger.info('Proxies saved to file');
+            const proxyStrings = this.proxies.map(proxy => 
+                `${proxy.host}:${proxy.port}:${proxy.username || ''}:${proxy.password || ''}`
+            ).join('\n');
+            
+            await fs.writeFile(this.proxyFile, proxyStrings);
+            loggerProxyManager.info('Proxies saved to file');
         } catch (error) {
-            logger.error('Error saving proxies:', error);
+            loggerProxyManager.error('Error saving proxies:', error);
         }
     }
 } 

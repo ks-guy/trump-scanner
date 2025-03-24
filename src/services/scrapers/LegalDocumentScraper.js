@@ -1,8 +1,8 @@
 import puppeteer from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import { executablePath } from 'puppeteer';
-import { delay, retry } from '../../utils/helpers.js';
-import { logger } from '../../utils/logger.js';
+import { sleep, randomDelay, retry } from '../../utils/helpers.js';
+import { createLoggerComponent } from '../../utils/logger.js';
 import { getRandomUserAgent } from '../../utils/userAgents.js';
 import { Quote } from '../../models/Quote.js';
 import { createWorker } from 'tesseract.js';
@@ -12,6 +12,12 @@ import path from 'path';
 import { PrismaClient } from '@prisma/client';
 import fetch from 'node-fetch';
 import { ProxyManager } from '../../utils/proxyManager.js';
+import { PDFDocument } from 'pdf-lib';
+import pdfParse from 'pdf-parse';
+import tesseract from 'tesseract.js';
+
+const logger = createLoggerComponent('LegalDocumentScraper');
+const prisma = new PrismaClient();
 
 // Add stealth plugin and use defaults
 puppeteer.use(StealthPlugin());
@@ -64,7 +70,6 @@ export class LegalDocumentScraper {
         this.pool = null;
         this.sourceId = null;
         this.proxyManager = new ProxyManager();
-        this.prisma = new PrismaClient();
     }
 
     async initialize() {
@@ -114,7 +119,7 @@ export class LegalDocumentScraper {
             await this.createDirectoryStructure();
 
             // Get or create source record
-            const source = await this.prisma.source.upsert({
+            const source = await prisma.source.upsert({
                 where: { url: this.config.baseUrl },
                 update: {},
                 create: {
@@ -557,7 +562,7 @@ export class LegalDocumentScraper {
 
     async saveDocument(documentData) {
         try {
-            const savedDoc = await this.prisma.document.upsert({
+            const savedDoc = await prisma.document.upsert({
                 where: { url: documentData.url || documentData.metadata?.url || '' },
                 update: {
                     content: documentData.content || '',
