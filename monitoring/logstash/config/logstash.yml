@@ -1,4 +1,24 @@
 http.host: "0.0.0.0"
 xpack.monitoring.enabled: false
 path.config: /usr/share/logstash/pipeline
-path.logs: /var/log/logstash 
+path.logs: /var/log/logstash
+xpack.monitoring.elasticsearch.hosts: [ "http://elasticsearch:9200" ]
+
+input {
+  beats {
+    port => 5044
+  }
+  tcp {
+    port => 5000
+  }
+  udp {
+    port => 5000
+  }
+}
+
+output {
+  elasticsearch {
+    hosts => ["elasticsearch:9200"]
+    index => "trump-scanner-%{+YYYY.MM.dd}"
+  }
+} 

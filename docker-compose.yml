@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   app:
     build:
@@ -19,205 +21,221 @@ services:
       - trump_scanner_network
 
   scraper:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    build: .
     container_name: trump-scanner
-    ports:
-      - "5555:5555"  # Prisma Studio
-    volumes:
-      - ./documents:/app/documents
-      - ./data:/app/data
-      - ./error_logs:/app/error_logs
     environment:
       - NODE_ENV=production
-      - TZ=UTC
-      - DATABASE_URL=mysql://scanner_user:scanner_password@db:3306/trump_scanner
-      - SCRAPEOPS_API_KEY=1e3ddfbb-c565-4464-b425-1d59057c7ad0
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 2G
-        reservations:
-          memory: 1G
-    cap_add:
-      - SYS_ADMIN
-    security_opt:
-      - seccomp=unconfined
-    networks:
-      - trump_scanner_network
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - ELASTICSEARCH_URL=${ELASTICSEARCH_URL}
+      - SCRAPEOPS_API_KEY=${SCRAPEOPS_API_KEY}
+      - COURT_LISTENER_API_KEY=${COURT_LISTENER_API_KEY}
+      - DOCUMENT_CLOUD_API_KEY=${DOCUMENT_CLOUD_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - GOOGLE_CSE_ID=${GOOGLE_CSE_ID}
+      - LOG_LEVEL=info
+    volumes:
+      - ./documents:/app/documents
+      - ./error_logs:/app/error_logs
+      - ./logs:/app/logs
+    ports:
+      - "5555:5555"  # Prisma Studio
+      - "3000:3000"  # Application
     depends_on:
       - db
+      - redis
+      - elasticsearch
+      - prometheus
+      - grafana
+      - alertmanager
+      - logstash
+      - kibana
+      - filebeat
+    networks:
+      - monitoring
+      - app-network
 
   prometheus:
-    image: prom/prometheus:latest
-    container_name: prometheus
-    ports:
-      - "9090:9090"
+    image: prom/prometheus:v2.45.0
+    container_name: trump-scanner-prometheus
     volumes:
       - ./monitoring/prometheus:/etc/prometheus
       - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
       - '--web.console.libraries=/usr/share/prometheus/console_libraries'
       - '--web.console.templates=/usr/share/prometheus/consoles'
-    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     networks:
-      - trump_scanner_network
+      - monitoring
 
   grafana:
-    image: grafana/grafana:latest
-    container_name: grafana
-    ports:
-      - "3001:3000"
+    image: grafana/grafana:10.0.3
+    container_name: trump-scanner-grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+      - GF_USERS_ALLOW_SIGN_UP=false
     volumes:
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
       - grafana_data:/var/lib/grafana
-    environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin123
-      - GF_USERS_ALLOW_SIGN_UP=false
-    restart: unless-stopped
+    ports:
+      - "3001:3000"
     depends_on:
       - prometheus
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     networks:
-      - trump_scanner_network
+      - monitoring
 
   alertmanager:
-    image: prom/alertmanager:latest
-    container_name: alertmanager
-    ports:
-      - "9093:9093"
+    image: prom/alertmanager:v0.25.0
+    container_name: trump-scanner-alertmanager
     volumes:
       - ./monitoring/alertmanager:/etc/alertmanager
+      - alertmanager_data:/alertmanager
+    ports:
+      - "9093:9093"
     command:
       - '--config.file=/etc/alertmanager/config.yml'
       - '--storage.path=/alertmanager'
-    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9093/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     networks:
-      - trump_scanner_network
+      - monitoring
 
   db:
     image: mysql:8.0
-    container_name: trump_scanner_mysql
+    container_name: trump-scanner-db
     environment:
-      MYSQL_ROOT_PASSWORD: rootpassword
-      MYSQL_DATABASE: trump_scanner
-      MYSQL_USER: scanner_user
-      MYSQL_PASSWORD: scanner_password
-    ports:
-      - "3306:3306"
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./prisma/migrations:/docker-entrypoint-initdb.d
-    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+      - ./prisma:/docker-entrypoint-initdb.d
+    ports:
+      - "3306:3306"
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
-      - trump_scanner_network
+      - app-network
 
   redis:
-    image: redis:6.2
-    container_name: trump_scanner_redis
-    ports:
-      - "6379:6379"
+    image: redis:7-alpine
+    container_name: trump-scanner-redis
     volumes:
       - redis_data:/data
-    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
-      - trump_scanner_network
+      - app-network
 
   elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.1
-    container_name: elasticsearch
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.1
+    container_name: trump-scanner-elasticsearch
     environment:
-      - node.name=elasticsearch
-      - cluster.name=es-docker-cluster
       - discovery.type=single-node
-      - bootstrap.memory_lock=true
-      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
       - xpack.security.enabled=false
-    ulimits:
-      memlock:
-        soft: -1
-        hard: -1
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
     volumes:
       - elasticsearch_data:/usr/share/elasticsearch/data
     ports:
       - "9200:9200"
     healthcheck:
-      test: ["CMD-SHELL", "curl -s http://localhost:9200 || exit 1"]
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q 'status.*green'"]
       interval: 30s
       timeout: 10s
       retries: 3
     networks:
-      - trump_scanner_network
+      - monitoring
 
   logstash:
-    image: docker.elastic.co/logstash/logstash:8.11.1
-    container_name: logstash
+    image: docker.elastic.co/logstash/logstash:8.12.1
+    container_name: trump-scanner-logstash
     volumes:
-      - ./monitoring/logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml:ro
-      - ./monitoring/logstash/pipeline:/usr/share/logstash/pipeline:ro
-      - ./logs:/logs:ro
+      - ./monitoring/logstash/config:/usr/share/logstash/config
+      - ./monitoring/logstash/pipeline:/usr/share/logstash/pipeline
+      - logstash_data:/usr/share/logstash/data
     ports:
       - "5044:5044"
-      - "5000:5000/tcp"
-      - "5000:5000/udp"
+      - "5000:5000"
       - "9600:9600"
-    environment:
-      LS_JAVA_OPTS: "-Xmx256m -Xms256m"
     depends_on:
       - elasticsearch
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9600"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     networks:
-      - trump_scanner_network
+      - monitoring
 
   kibana:
-    image: docker.elastic.co/kibana/kibana:8.11.1
-    container_name: kibana
+    image: docker.elastic.co/kibana/kibana:8.12.1
+    container_name: trump-scanner-kibana
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
     ports:
       - "5601:5601"
-    environment:
-      - ELASTICSEARCH_URL=http://elasticsearch:9200
-      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
     depends_on:
       - elasticsearch
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:5601/api/status | grep -q 'available.*true'"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     networks:
-      - trump_scanner_network
+      - monitoring
 
   filebeat:
-    image: docker.elastic.co/beats/filebeat:8.11.1
-    container_name: filebeat
-    user: root
+    image: docker.elastic.co/beats/filebeat:8.12.1
+    container_name: trump-scanner-filebeat
     volumes:
-      - ./monitoring/filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
-      - ./logs:/logs:ro
-      - /var/lib/docker/containers:/var/lib/docker/containers:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    command: filebeat -e -strict.perms=false
+      - ./monitoring/filebeat:/usr/share/filebeat
+      - ./logs:/app/logs:ro
+      - ./error_logs:/app/error_logs:ro
     depends_on:
-      - elasticsearch
       - logstash
     networks:
-      - trump_scanner_network
+      - monitoring
 
 volumes:
   mysql_data:
   redis_data:
+  elasticsearch_data:
   prometheus_data:
   grafana_data:
-  elasticsearch_data:
+  alertmanager_data:
+  logstash_data:
 
 networks:
+  app-network:
+    driver: bridge
+  monitoring:
+    driver: bridge
   trump_scanner_network:
     driver: bridge 

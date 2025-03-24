@@ -4,14 +4,19 @@ global:
 route:
   group_by: ['alertname']
   group_wait: 10s
-  group_interval: 10s
-  repeat_interval: 1h
-  receiver: 'web.hook'
+  group_interval: 5m
+  repeat_interval: 4h
+  receiver: 'email-notifications'
 
 receivers:
-  - name: 'web.hook'
-    webhook_configs:
-      - url: 'http://127.0.0.1:5001/'
+  - name: 'email-notifications'
+    email_configs:
+      - to: 'your@email.com'
+        from: 'alertmanager@trump-scanner.com'
+        smarthost: 'smtp.gmail.com:587'
+        auth_username: 'your-email@gmail.com'
+        auth_password: 'your-app-specific-password'
+        send_resolved: true
 
 inhibit_rules:
   - source_match:
