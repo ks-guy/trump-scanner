@@ -30,6 +30,12 @@ COPY . .
 # Create necessary directories
 RUN mkdir -p documents/legal/pdfs error_logs
 
+# Generate Prisma client
+RUN npx prisma generate
+
+# Run Prisma migrations
+RUN npx prisma migrate deploy
+
 # Expose port for Prisma Studio
 EXPOSE 5555
 

@@ -1,144 +1,89 @@
-# Trump Scanner - Document Processing Service
+# Trump Scanner
 
-This service provides advanced document processing capabilities for the Trump Scanner project, including OCR, signature verification, and document authenticity checks.
+A web scraper for collecting legal documents and quotes related to Donald Trump.
 
 ## Features
 
-### Document Processing
-- Support for multiple document types (PDF, Word, Images)
-- OCR processing using Tesseract.js
-- Document structure analysis
-- Table and image extraction
-- Metadata extraction
+- Legal document scraping from CourtListener
+- Quote collection from various sources
+- PDF document processing
+- MySQL database storage
+- Prisma Studio for data monitoring
 
-### Image Processing
-- Image quality enhancement
-- Denoising
-- Contrast adjustment
-- Gamma correction
-- Image hash generation for duplicate detection
+## Prerequisites
 
-### Signature Verification
-- Signature detection
-- Signature verification
-- Handwriting analysis
-- Comparison with known signatures
+- Docker and Docker Compose
+- Node.js 20+ (for local development)
+- MySQL 8.0 (for local development)
 
-### Document Authenticity
-- Digital signature verification
-- Hash verification
-- Metadata validation
-- Content integrity checks
+## Quick Start with Docker
 
-### Document Analysis
-- Text extraction and analysis
-- Structure analysis
-- Key information identification
-- Report generation
+1. Clone the repository:
+```bash
+git clone https://github.com/ks-guy/trump-scanner.git
+cd trump-scanner
+```
 
-## Installation
+2. Create a `.env` file with your ScrapeOps API key:
+```
+SCRAPEOPS_API_KEY=your_api_key_here
+```
+
+3. Start the services:
+```bash
+docker-compose up -d
+```
+
+4. Access Prisma Studio at http://localhost:5555
+
+## Local Development Setup
 
 1. Install dependencies:
 ```bash
 npm install
 ```
 
-2. Set up environment variables:
+2. Set up the database:
 ```bash
-cp .env.example .env
-# Edit .env with your configuration
+npx prisma migrate dev
 ```
 
-3. Run the service:
+3. Start Prisma Studio:
 ```bash
-npm start
+npx prisma studio
 ```
 
-## Usage
-
-### Basic Document Processing
-```javascript
-const documentService = require('./src/services/documentProcessingService');
-
-// Process a document
-const result = await documentService.processDocument('path/to/document.pdf', {
-  ocr: true,
-  verifySignatures: true
-});
+4. Start the scraper:
+```bash
+npm run scrape:legal
 ```
 
-### Image Enhancement
-```javascript
-const enhancedImage = await documentService.enhanceImageQuality('path/to/image.jpg', {
-  denoise: true,
-  enhance: true,
-  contrast: true
-});
+## Project Structure
+
+- `src/services/scrapers/` - Scraper implementations
+- `src/utils/` - Utility functions
+- `prisma/` - Database schema and migrations
+- `documents/` - Downloaded documents
+- `error_logs/` - Error logs
+
+## Environment Variables
+
+- `SCRAPEOPS_API_KEY` - Your ScrapeOps API key
+- `DATABASE_URL` - MySQL connection string (default: mysql://scanner_user:scanner_password@localhost:3306/trump_scanner)
+
+## Docker Commands
+
+- Start services: `docker-compose up -d`
+- Stop services: `docker-compose down`
+- View logs: `docker-compose logs -f`
+- Rebuild: `docker-compose up -d --build`
+
+## Database Backup
+
+To backup the database:
+```bash
+npx prisma db pull
 ```
-
-### Document Verification
-```javascript
-const verification = await documentService.verifyDocumentAuthenticity(document);
-```
-
-### Report Generation
-```javascript
-const report = await documentService.generateDocumentReport(document);
-```
-
-## API Reference
-
-### processDocument(documentPath, options)
-Processes a document with specified options.
-
-**Parameters:**
-- `documentPath` (string): Path to the document
-- `options` (object):
-  - `ocr` (boolean): Enable OCR processing
-  - `verifySignatures` (boolean): Enable signature verification
-  - `extractMetadata` (boolean): Enable metadata extraction
-
-**Returns:** Processed document object
-
-### enhanceImageQuality(imagePath, options)
-Enhances image quality with specified options.
-
-**Parameters:**
-- `imagePath` (string): Path to the image
-- `options` (object):
-  - `denoise` (boolean): Enable denoising
-  - `enhance` (boolean): Enable enhancement
-  - `contrast` (boolean): Enable contrast adjustment
-
-**Returns:** Path to enhanced image
-
-### verifyDocumentAuthenticity(document)
-Verifies document authenticity.
-
-**Parameters:**
-- `document` (object): Document object
-
-**Returns:** Verification result object
-
-### generateDocumentReport(document)
-Generates a detailed report for a document.
-
-**Parameters:**
-- `document` (object): Document object
-
-**Returns:** Report object
-
-## Dependencies
-
-- tesseract.js: OCR processing
-- pdf-parse: PDF parsing
-- mammoth: Word document parsing
-- jimp: Image processing
-- image-hash: Image hash generation
-- exifr: EXIF data extraction
-- pdf-lib: PDF manipulation
-- node-signpdf: PDF signature verification
-- node-forge: Cryptographic operations
 
 ## Contributing
 
@@ -146,8 +91,4 @@ Generates a detailed report for a document.
 2. Create your feature branch
 3. Commit your changes
 4. Push to the branch
-5. Create a new Pull Request
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details. 
+5. Create a Pull Request 
