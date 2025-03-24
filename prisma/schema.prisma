@@ -6,206 +6,39 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql"
-  url      = env("DATABASE_URL")
+  provider = "sqlite"
+  url      = "file:./dev.db"
 }
 
-/// Represents a legal document from various sources
+model Quote {
+  id         Int      @id @default(autoincrement())
+  source_url String
+  quote_text String
+  context    Json?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([source_url])
+}
+
 model LegalDocument {
   id          Int      @id @default(autoincrement())
   title       String
-  content     String   @db.Text
-  sourceUrl   String   @unique
-  sourceType  String   // e.g., "court_filing", "legal_brief", "judgment"
+  url         String
+  content     String
+  type        String
   date        DateTime
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  status      String   @default("pending") // pending, verified, rejected
-  metadata    Json?    // Additional document metadata
-  quotes      Quote[]  // Related quotes from this document
-  mediaFiles  MediaFile[] // Associated media files
-  tags        Tag[]    // Document categorization tags
-  categories  Category[] // Document categories
-  entities    Entity[] // Named entities found in the document
-  sentiment    SentimentAnalysis? // Sentiment analysis results
-  embeddings   Embedding[] // Vector embeddings for search
-  citations    Citation[] // References to other documents
-  versions     DocumentVersion[] // Document version history
-
-  @@index([sourceUrl])
-  @@index([date])
-  @@index([status])
-  @@fulltext([title, content])
 }
 
-/// Represents a quote extracted from a legal document
-model Quote {
-  id              Int      @id @default(autoincrement())
-  text            String   @db.Text
-  context         String?  @db.Text
-  documentId      Int
-  document        LegalDocument @relation(fields: [documentId], references: [id])
-  speaker         String?
-  date            DateTime?
-  sentiment       Float?   // Sentiment score (-1 to 1)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  entities        Entity[] // Named entities in the quote
-  embeddings      Embedding[] // Vector embeddings for search
-  categories      Category[] // Quote categories
-  tags            Tag[] // Quote tags
-
-  @@index([documentId])
-  @@index([date])
-  @@fulltext([text, context])
-}
-
-/// Represents a media file associated with a document
-model MediaFile {
-  id              Int      @id @default(autoincrement())
-  documentId      Int
-  document        LegalDocument @relation(fields: [documentId], references: [id])
-  fileType        String   // pdf, image, video, audio
-  filePath        String
-  fileSize        Int
-  mimeType        String
-  metadata        Json?    // Additional file metadata
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  processingStatus String  @default("pending") // pending, processing, completed, failed
-  processingError String?  @db.Text
-  thumbnails      Thumbnail[] // Generated thumbnails
-  transcript      Transcript? // For audio/video files
-
-  @@index([documentId])
-  @@index([processingStatus])
-}
-
-/// Represents a thumbnail generated from a media file
-model Thumbnail {
-  id              Int      @id @default(autoincrement())
-  mediaFileId     Int
-  mediaFile       MediaFile @relation(fields: [mediaFileId], references: [id])
-  filePath        String
-  width           Int
-  height          Int
-  format          String
-  createdAt       DateTime @default(now())
-
-  @@index([mediaFileId])
-}
-
-/// Represents a transcript for audio/video files
-model Transcript {
-  id              Int      @id @default(autoincrement())
-  mediaFileId     Int      @unique
-  mediaFile       MediaFile @relation(fields: [mediaFileId], references: [id])
-  content         String   @db.Text
-  language        String
-  confidence      Float
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  @@index([mediaFileId])
-}
-
-/// Represents a tag for categorizing documents and quotes
-model Tag {
-  id              Int      @id @default(autoincrement())
-  name            String   @unique
-  description     String?
-  documents       LegalDocument[]
-  quotes          Quote[]
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  @@index([name])
-}
-
-/// Represents a category for organizing documents and quotes
-model Category {
-  id              Int      @id @default(autoincrement())
-  name            String   @unique
-  description     String?
-  parentId        Int?
-  parent          Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
-  children        Category[] @relation("CategoryHierarchy")
-  documents       LegalDocument[]
-  quotes          Quote[]
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  @@index([name])
-  @@index([parentId])
-}
-
-/// Represents a named entity found in documents or quotes
-model Entity {
-  id              Int      @id @default(autoincrement())
-  name            String
-  type            String   // person, organization, location, etc.
-  documents       LegalDocument[]
-  quotes          Quote[]
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  @@index([name])
-  @@index([type])
-}
-
-/// Represents sentiment analysis results for a document
-model SentimentAnalysis {
-  id              Int      @id @default(autoincrement())
-  documentId      Int      @unique
-  document        LegalDocument @relation(fields: [documentId], references: [id])
-  overallScore    Float
-  details         Json     // Detailed sentiment analysis results
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  @@index([documentId])
-}
-
-/// Represents vector embeddings for semantic search
-model Embedding {
-  id              Int      @id @default(autoincrement())
-  documentId      Int?
-  document        LegalDocument? @relation(fields: [documentId], references: [id])
-  quoteId         Int?
-  quote           Quote? @relation(fields: [quoteId], references: [id])
-  vector          Bytes    // Vector data for semantic search
-  model           String   // Name of the embedding model used
-  createdAt       DateTime @default(now())
-
-  @@index([documentId])
-  @@index([quoteId])
-}
-
-/// Represents citations between documents
-model Citation {
-  id              Int      @id @default(autoincrement())
-  sourceDocId     Int
-  sourceDoc       LegalDocument @relation("SourceCitations", fields: [sourceDocId], references: [id])
-  targetDocId     Int
-  targetDoc       LegalDocument @relation("TargetCitations", fields: [targetDocId], references: [id])
-  context         String?  @db.Text
-  createdAt       DateTime @default(now())
-
-  @@index([sourceDocId])
-  @@index([targetDocId])
-  @@unique([sourceDocId, targetDocId])
-}
-
-/// Represents version history of documents
-model DocumentVersion {
-  id              Int      @id @default(autoincrement())
-  documentId      Int
-  document        LegalDocument @relation(fields: [documentId], references: [id])
-  version         Int
-  content         String   @db.Text
-  changes         Json?    // Description of changes
-  createdAt       DateTime @default(now())
-
-  @@index([documentId])
-  @@unique([documentId, version])
-}
+model NewsArticle {
+  id          Int      @id @default(autoincrement())
+  title       String
+  url         String
+  content     String
+  source      String
+  publishedAt DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+} 
